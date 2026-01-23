@@ -6,6 +6,9 @@ import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.regex.Pattern
 
 class RssParser {
 
@@ -42,6 +45,7 @@ class RssParser {
         var currentLink: String? = null
         var currentDescription: String? = null
         var currentPubDate: String? = null
+        var currentImageUrl: String? = null
         var isInsideItem = false
 
         while (eventType != XmlPullParser.END_DOCUMENT) {
@@ -54,12 +58,33 @@ class RssParser {
                         currentLink = null
                         currentDescription = null
                         currentPubDate = null
+                        currentImageUrl = null
                     } else if (isInsideItem) {
                         when (name.lowercase()) {
                             "title" -> currentTitle = readText(parser)
                             "link" -> currentLink = readText(parser)
-                            "description" -> currentDescription = readText(parser)
+                            "description" -> {
+                                currentDescription = readText(parser)
+                                // Try to extract image from description if not found yet
+                                if (currentImageUrl == null) {
+                                    currentImageUrl = extractImageFromHtml(currentDescription)
+                                }
+                            }
                             "pubdate" -> currentPubDate = readText(parser)
+                            "media:content", "enclosure" -> {
+                                // Try to get url attribute
+                                val url = parser.getAttributeValue(null, "url")
+                                val type = parser.getAttributeValue(null, "type")
+                                if (currentImageUrl == null && url != null && (type?.startsWith("image") == true || isImageExtension(url))) {
+                                    currentImageUrl = url
+                                }
+                            }
+                            "media:thumbnail" -> {
+                                val url = parser.getAttributeValue(null, "url")
+                                if (currentImageUrl == null && url != null) {
+                                    currentImageUrl = url
+                                }
+                            }
                         }
                     }
                 }
@@ -71,8 +96,9 @@ class RssParser {
                                 Article(
                                     title = currentTitle,
                                     link = currentLink,
-                                    description = currentDescription,
-                                    pubDate = currentPubDate
+                                    description = cleanHtml(currentDescription),
+                                    pubDate = currentPubDate,
+                                    imageUrl = currentImageUrl
                                 )
                             )
                         }
@@ -91,5 +117,24 @@ class RssParser {
             parser.nextTag()
         }
         return result
+    }
+
+    private fun extractImageFromHtml(html: String?): String? {
+        if (html == null) return null
+        val matcher = Pattern.compile("src=\"([^\"]+)\"").matcher(html)
+        return if (matcher.find()) {
+            matcher.group(1)
+        } else {
+            null
+        }
+    }
+
+    private fun isImageExtension(url: String): Boolean {
+        return url.endsWith(".jpg") || url.endsWith(".png") || url.endsWith(".jpeg") || url.endsWith(".webp")
+    }
+
+    private fun cleanHtml(html: String?): String? {
+        // Simple HTML stripping
+        return html?.replace(Regex("<.*?>"), "")?.replace("&nbsp;", " ")?.trim()
     }
 }

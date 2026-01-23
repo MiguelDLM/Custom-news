@@ -17,10 +17,12 @@ class NewsApplication : Application() {
         database = Room.databaseBuilder(
             applicationContext,
             AppDatabase::class.java, "news-database"
-        ).build()
+        )
+        .fallbackToDestructiveMigration()
+        .build()
 
         val rssParser = RssParser()
-        newsRepository = NewsRepository(database.feedDao(), rssParser)
+        newsRepository = NewsRepository(database.feedDao(), database.articleDao(), rssParser)
         scriptRepository = ScriptRepository(database.scriptDao())
     }
 }

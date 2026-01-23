@@ -8,5 +8,6 @@ data class FeedEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val url: String,
     val title: String,
-    val description: String? = null
+    val description: String? = null,
+    val category: String = "General" // New field
 )

@@ -13,6 +13,9 @@ interface FeedDao {
     @Query("SELECT * FROM feeds")
     fun getAllFeeds(): Flow<List<FeedEntity>>
 
+    @Query("SELECT COUNT(*) FROM feeds")
+    suspend fun getFeedCount(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFeed(feed: FeedEntity)
 
