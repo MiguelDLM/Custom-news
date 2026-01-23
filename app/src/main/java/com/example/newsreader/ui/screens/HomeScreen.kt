@@ -1,10 +1,19 @@
 package com.example.newsreader.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -40,12 +49,24 @@ fun HomeScreen(
     
     // Data states
     val feeds by newsRepository.allFeeds.collectAsState(initial = emptyList())
+    // hidden tabs feature removed; keep for compatibility but always empty
     val hiddenTabs by newsRepository.hiddenTabs.collectAsState(initial = emptySet())
     val whitelist by newsRepository.whitelist.collectAsState(initial = emptySet())
-
+    val searchHistory by newsRepository.searchHistory.collectAsState(initial = emptyList())
+    
+    val tabOrder by newsRepository.tabOrder.collectAsState(initial = emptyList())
+    
     // Define all possible categories
-    val allCategories = remember(feeds) {
-        (listOf("For You") + feeds.map { it.category }.distinct().sorted())
+    val allCategories = remember(feeds, tabOrder) {
+        val rawCategories = (listOf("For You") + feeds.map { it.category }.distinct().sorted())
+        // Apply custom order if exists
+        if (tabOrder.isNotEmpty()) {
+            val ordered = tabOrder.filter { rawCategories.contains(it) }
+            val remaining = rawCategories.filter { !ordered.contains(it) }
+            ordered + remaining
+        } else {
+            rawCategories
+        }
     }
     
     // Filter hidden tabs
@@ -85,11 +106,6 @@ fun HomeScreen(
     // Articles State
     var articles by remember { mutableStateOf<List<ArticleEntity>>(emptyList()) }
     
-    // Sync on start
-    LaunchedEffect(Unit) {
-        newsRepository.checkSync()
-    }
-
     // Update articles logic
     LaunchedEffect(currentCategoryKey, searchQuery, sortByDate, whitelist) {
         if (searchQuery.isNotEmpty()) {
@@ -115,13 +131,69 @@ fun HomeScreen(
                 SearchBar(
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
-                    onSearch = { },
+                    onSearch = { 
+                        if (searchQuery.isNotBlank()) {
+                            scope.launch { newsRepository.saveSearch(searchQuery) }
+                        }
+                    },
                     active = true,
                     onActiveChange = { isSearchActive = it },
                     placeholder = { Text(stringResource(R.string.search_hint)) },
-                    trailingIcon = { IconButton(onClick = { isSearchActive = false; searchQuery = "" }) { Icon(Icons.Default.Settings, "Close") } } 
+                    trailingIcon = { 
+                        if (searchQuery.isNotEmpty()) {
+                             IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, "Clear") }
+                        } else {
+                             IconButton(onClick = { isSearchActive = false }) { Icon(Icons.Default.Close, "Close") } 
+                        }
+                    } 
                 ) {
-                   // Results in main content
+                   if (searchQuery.isEmpty()) {
+                       LazyColumn {
+                           item {
+                               Row(
+                                   modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                   horizontalArrangement = Arrangement.SpaceBetween,
+                                   verticalAlignment = Alignment.CenterVertically
+                               ) {
+                                   Text("Recent Searches", style = MaterialTheme.typography.titleMedium)
+                                   if (searchHistory.isNotEmpty()) {
+                                       TextButton(onClick = { scope.launch { newsRepository.clearHistory() } }) {
+                                           Text("Clear All")
+                                       }
+                                   }
+                               }
+                           }
+                           items(searchHistory) { historyItem ->
+                               ListItem(
+                                   headlineContent = { Text(historyItem.query) },
+                                   leadingContent = { Icon(Icons.Default.History, null) },
+                                   trailingContent = { 
+                                       IconButton(onClick = { scope.launch { newsRepository.deleteHistoryItem(historyItem) } }) {
+                                           Icon(Icons.Default.Close, "Remove")
+                                       }
+                                   },
+                                   modifier = Modifier.clickable { searchQuery = historyItem.query }
+                               )
+                           }
+                       }
+                   } else {
+                       // Show results here if SearchBar supports content for results, 
+                       // otherwise we rely on main content below, but SearchBar overlays content usually.
+                       // We should duplicate result list here or hide main content.
+                       // For simplicity in this structure, let's show results list inside SearchBar if active
+                       LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                       ) {
+                            items(articles) { article ->
+                                NewsCard(
+                                    article = article, 
+                                    onClick = { onArticleClick(article.link) },
+                                    sourceName = getDomainName(article.link)
+                                )
+                            }
+                       }
+                   }
                 }
             } else {
                 Column {
@@ -156,8 +228,27 @@ fun HomeScreen(
                         }
                     )
                     if (displayCategories.isNotEmpty()) {
+                        // Simple, stable tabs bar. Reordering is available from Settings only.
+                        val tabs = visibleCategories
+                        if (tabs.isEmpty()) {
+                            selectedCategoryIndex = 0
+                        } else if (selectedCategoryIndex >= tabs.size) {
+                            selectedCategoryIndex = tabs.size - 1
+                        }
+
                         ScrollableTabRow(selectedTabIndex = selectedCategoryIndex) {
-                            displayCategories.forEachIndexed { index, title ->
+                            tabs.forEachIndexed { index, key ->
+                                val title = when (key) {
+                                    "For You" -> stringResource(R.string.for_you)
+                                    "Politics" -> stringResource(R.string.politics)
+                                    "Technology" -> stringResource(R.string.technology)
+                                    "Sports" -> stringResource(R.string.sports)
+                                    "Finance" -> stringResource(R.string.finance)
+                                    "World" -> stringResource(R.string.world)
+                                    "General" -> stringResource(R.string.general)
+                                    else -> key
+                                }
+
                                 Tab(
                                     selected = selectedCategoryIndex == index,
                                     onClick = { selectedCategoryIndex = index; searchQuery = "" },

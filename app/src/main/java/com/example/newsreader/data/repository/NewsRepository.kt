@@ -16,8 +16,11 @@ import com.example.newsreader.util.RssParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import com.example.newsreader.data.local.dao.SearchHistoryDao
+import com.example.newsreader.data.local.entity.SearchHistoryEntity
 
 data class SuggestedFeed(
     val url: String,
@@ -31,12 +34,28 @@ class NewsRepository(
     private val articleDao: ArticleDao,
     private val rssParser: RssParser,
     private val settingsRepository: SettingsRepository,
-    private val context: Context
+    private val context: Context,
+    private val searchHistoryDao: SearchHistoryDao // Add this
 ) {
-    val hiddenTabs: Flow<Set<String>> = settingsRepository.hiddenTabs
+    // Hidden tabs removed from settings repository; maintain empty set for compatibility
+    val hiddenTabs: Flow<Set<String>> = settingsRepository.tabOrder.map { emptySet<String>() }
     val whitelist: Flow<Set<String>> = settingsRepository.keywordWhitelist
+    val tabOrder: Flow<List<String>> = settingsRepository.tabOrder
     
     val allFeeds: Flow<List<FeedEntity>> = feedDao.getAllFeeds()
+    val searchHistory: Flow<List<SearchHistoryEntity>> = searchHistoryDao.getRecentSearches() // Add this
+
+    suspend fun saveSearch(query: String) {
+        searchHistoryDao.insertSearch(SearchHistoryEntity(query = query))
+    }
+
+    suspend fun clearHistory() {
+        searchHistoryDao.clearHistory()
+    }
+    
+    suspend fun deleteHistoryItem(item: SearchHistoryEntity) {
+        searchHistoryDao.deleteSearch(item)
+    }
 
     fun getAllArticles(): Flow<List<ArticleEntity>> {
         return combine(
@@ -200,31 +219,122 @@ class NewsRepository(
     suspend fun search(query: String): List<ArticleEntity> {
         return articleDao.searchArticles(query) // DAO usually needs wildcards if not added there
     }
+
+    // Allow updating tab order from UI
+    suspend fun setTabOrder(order: List<String>) {
+        settingsRepository.setTabOrder(order)
+    }
     
     // Updated list of suggested feeds
-    val suggestedFeeds = listOf(
-        // Mexico
-        SuggestedFeed("https://www.eluniversal.com.mx/arc/outboundfeeds/rss/", "El Universal", "General", "MX"),
-        SuggestedFeed("https://www.milenio.com/rss", "Milenio", "General", "MX"),
-        SuggestedFeed("https://www.infobae.com/arc/outboundfeeds/rss/?category=/mexico", "Infobae México", "General", "MX"),
-        SuggestedFeed("https://aristeguinoticias.com/feed/mexico", "Aristegui Noticias", "General", "MX"),
-        SuggestedFeed("https://www.excelsior.com.mx/rss", "Excelsior", "General", "MX"),
-        SuggestedFeed("https://www.proceso.com.mx/rss/feed.html", "Proceso", "Politics", "MX"),
-        SuggestedFeed("https://www.elfinanciero.com.mx/rss", "El Financiero", "Finance", "MX"),
-        SuggestedFeed("http://feeds.weblogssl.com/xatakamexico", "Xataka México", "Technology", "MX"),
+val suggestedFeeds = listOf(
 
-        // USA
-        SuggestedFeed("https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", "NY Times", "General", "US"),
-        SuggestedFeed("https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "NY Times World", "World", "US"),
-        SuggestedFeed("http://rss.cnn.com/rss/edition.rss", "CNN", "General", "US"),
-        SuggestedFeed("https://www.espn.com/espn/rss/news", "ESPN", "Sports", "US"),
-        SuggestedFeed("https://techcrunch.com/feed/", "TechCrunch", "Technology", "US"),
-        SuggestedFeed("https://www.theverge.com/rss/index.xml", "The Verge", "Technology", "US"),
+    // ======================
+    // 🇲🇽 MEXICO – GENERAL
+    // ======================
 
-        // Spain
-        SuggestedFeed("https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada", "El País", "General", "ES"),
-        SuggestedFeed("https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml", "El Mundo", "General", "ES"),
-        SuggestedFeed("https://e00-marca.uecdn.es/rss/portada.xml", "Marca", "Sports", "ES"),
-        SuggestedFeed("https://e00-expansion.uecdn.es/rss/portada.xml", "Expansión", "Finance", "ES")
-    )
+    SuggestedFeed("https://www.eluniversal.com.mx/arc/outboundfeeds/rss/", "El Universal", "General", "MX"),
+    SuggestedFeed("https://www.eluniversal.com.mx/rss/nacion.xml", "El Universal", "Politics", "MX"),
+    SuggestedFeed("https://www.eluniversal.com.mx/rss/cartera.xml", "El Universal", "Finance", "MX"),
+    SuggestedFeed("https://www.eluniversal.com.mx/rss/cultura.xml", "El Universal", "Culture", "MX"),
+
+    SuggestedFeed("https://www.milenio.com/rss", "Milenio", "General", "MX"),
+    SuggestedFeed("https://www.milenio.com/rss/politica", "Milenio", "Politics", "MX"),
+    SuggestedFeed("https://www.milenio.com/rss/negocios", "Milenio", "Finance", "MX"),
+
+    SuggestedFeed("https://aristeguinoticias.com/feed", "Aristegui Noticias", "General", "MX"),
+    SuggestedFeed("https://aristeguinoticias.com/feed/mexico", "Aristegui Noticias", "Politics", "MX"),
+    SuggestedFeed("https://aristeguinoticias.com/feed/economia", "Aristegui Noticias", "Finance", "MX"),
+
+    SuggestedFeed("https://www.proceso.com.mx/rss/", "Proceso", "General", "MX"),
+    SuggestedFeed("https://www.proceso.com.mx/rss/politica.html", "Proceso", "Politics", "MX"),
+    SuggestedFeed("https://www.proceso.com.mx/rss/cultura.html", "Proceso", "Culture", "MX"),
+
+    SuggestedFeed("https://www.animalpolitico.com/feed/", "Animal Político", "General", "MX"),
+    SuggestedFeed("https://www.animalpolitico.com/politica/feed/", "Animal Político", "Politics", "MX"),
+    SuggestedFeed("https://www.animalpolitico.com/seguridad/feed/", "Animal Político", "Security", "MX"),
+
+    SuggestedFeed("https://www.sinembargo.mx/feed", "SinEmbargo", "General", "MX"),
+    SuggestedFeed("https://www.sinembargo.mx/economia/feed", "SinEmbargo", "Finance", "MX"),
+
+    SuggestedFeed("https://www.elfinanciero.com.mx/rss", "El Financiero", "Finance", "MX"),
+    SuggestedFeed("https://www.elfinanciero.com.mx/empresas/rss", "El Financiero", "Business", "MX"),
+
+    SuggestedFeed("https://www.reforma.com/rss/portada.xml", "Reforma", "General", "MX"),
+    SuggestedFeed("https://www.reforma.com/rss/nacional.xml", "Reforma", "Politics", "MX"),
+    SuggestedFeed("https://www.reforma.com/rss/internacional.xml", "Reforma", "World", "MX"),
+    SuggestedFeed("https://www.reforma.com/rss/negocios.xml", "Reforma", "Finance", "MX"),
+
+    SuggestedFeed("https://expansion.mx/rss", "Expansión", "Finance", "MX"),
+    SuggestedFeed("https://expansion.mx/rss/politica", "Expansión", "Politics", "MX"),
+    SuggestedFeed("https://expansion.mx/rss/tecnologia", "Expansión", "Technology", "MX"),
+    SuggestedFeed("https://expansion.mx/rss/internacional", "Expansión", "World", "MX"),
+
+    SuggestedFeed("https://www.xataka.com.mx/feed", "Xataka México", "Technology", "MX"),
+    SuggestedFeed("https://feeds.weblogssl.com/xatakamexico", "Xataka México", "Technology", "MX"),
+
+    SuggestedFeed("https://hipertextual.com/feed", "Hipertextual", "Technology", "MX"),
+
+    SuggestedFeed("https://mexiconewsdaily.com/feed", "Mexico News Daily", "General", "MX"),
+    SuggestedFeed("https://vanguardia.com.mx/rss.xml", "Vanguardia", "General", "MX"),
+    SuggestedFeed("http://elsiglodetorreon.com.mx/rss.xml", "El Siglo de Torreón", "General", "MX"),
+    SuggestedFeed("https://yucatan.com.mx/feed", "Diario de Yucatán", "Local", "MX"),
+    SuggestedFeed("https://informador.mx/rss/mexico.xml", "El Informador", "General", "MX"),
+    SuggestedFeed("https://24-horas.mx/feed", "24 Horas", "General", "MX"),
+    SuggestedFeed("https://sdpnoticias.com/rss", "SDP Noticias", "General", "MX"),
+    SuggestedFeed("https://publimetro.com.mx/rss", "Publimetro", "General", "MX"),
+
+
+    // ======================
+    // 🇺🇸 USA
+    // ======================
+
+    SuggestedFeed("https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", "New York Times", "General", "US"),
+    SuggestedFeed("https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "New York Times", "World", "US"),
+    SuggestedFeed("https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", "New York Times", "Technology", "US"),
+    SuggestedFeed("https://rss.nytimes.com/services/xml/rss/nyt/Science.xml", "New York Times", "Science", "US"),
+
+    SuggestedFeed("https://feeds.washingtonpost.com/rss/world", "Washington Post", "World", "US"),
+    SuggestedFeed("https://feeds.washingtonpost.com/rss/politics", "Washington Post", "Politics", "US"),
+
+    SuggestedFeed("http://rss.cnn.com/rss/edition.rss", "CNN", "General", "US"),
+    SuggestedFeed("http://rss.cnn.com/rss/edition_technology.rss", "CNN", "Technology", "US"),
+
+    SuggestedFeed("https://feeds.npr.org/1001/rss.xml", "NPR", "General", "US"),
+    SuggestedFeed("https://feeds.npr.org/1019/rss.xml", "NPR", "Technology", "US"),
+
+    SuggestedFeed("https://techcrunch.com/feed/", "TechCrunch", "Technology", "US"),
+    SuggestedFeed("https://www.theverge.com/rss/index.xml", "The Verge", "Technology", "US"),
+    SuggestedFeed("https://arstechnica.com/feed/", "Ars Technica", "Technology", "US"),
+    SuggestedFeed("https://www.scientificamerican.com/feed/", "Scientific American", "Science", "US"),
+
+
+    // ======================
+    // 🇪🇸 SPAIN
+    // ======================
+
+    SuggestedFeed("https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada", "El País", "General", "ES"),
+    SuggestedFeed("https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/politica", "El País", "Politics", "ES"),
+    SuggestedFeed("https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/ciencia", "El País", "Science", "ES"),
+
+    SuggestedFeed("https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml", "El Mundo", "General", "ES"),
+    SuggestedFeed("https://e00-elmundo.uecdn.es/elmundo/rss/economia.xml", "El Mundo", "Finance", "ES"),
+
+    SuggestedFeed("https://e00-marca.uecdn.es/rss/portada.xml", "Marca", "Sports", "ES"),
+    SuggestedFeed("https://e00-expansion.uecdn.es/rss/portada.xml", "Expansión España", "Finance", "ES"),
+
+
+    // ======================
+    // 🌍 INTERNATIONAL
+    // ======================
+
+    SuggestedFeed("https://www.bbc.com/news/rss.xml", "BBC News", "World", "UK"),
+    SuggestedFeed("https://www.bbc.com/news/technology/rss.xml", "BBC News", "Technology", "UK"),
+
+    SuggestedFeed("https://www.theguardian.com/world/rss", "The Guardian", "World", "UK"),
+    SuggestedFeed("https://www.theguardian.com/science/rss", "The Guardian", "Science", "UK"),
+
+    SuggestedFeed("https://www.aljazeera.com/xml/rss/all.xml", "Al Jazeera", "World", "QA"),
+    SuggestedFeed("https://restofworld.org/feed/", "Rest of World", "Technology", "INT")
+)
+
 }

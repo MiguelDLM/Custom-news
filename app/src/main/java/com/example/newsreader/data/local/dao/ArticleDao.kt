@@ -15,7 +15,8 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE category = :category ORDER BY pubDateMillis DESC")
     fun getArticlesByCategory(category: String): Flow<List<ArticleEntity>>
 
-    @Query("SELECT * FROM articles WHERE title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%' ORDER BY pubDateMillis DESC")
+    // Use COLLATE NOCASE to make searches case-insensitive and more reliable across locales
+    @Query("SELECT * FROM articles WHERE title LIKE '%' || :query || '%' COLLATE NOCASE OR description LIKE '%' || :query || '%' COLLATE NOCASE ORDER BY pubDateMillis DESC")
     suspend fun searchArticles(query: String): List<ArticleEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE) // Ignore duplicates based on link unique index

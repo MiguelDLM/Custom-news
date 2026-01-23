@@ -30,7 +30,8 @@ class NewsApplication : Application() {
             database.articleDao(), 
             rssParser,
             settingsRepository,
-            applicationContext
+            applicationContext,
+            database.searchHistoryDao()
         )
         scriptRepository = ScriptRepository(database.scriptDao())
     }

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
@@ -20,15 +21,28 @@ class SettingsRepository(private val context: Context) {
         val KEYWORD_WHITELIST_KEY = stringSetPreferencesKey("keyword_whitelist")
         val KEYWORD_BLACKLIST_KEY = stringSetPreferencesKey("keyword_blacklist")
         val LAST_SYNC_KEY = longPreferencesKey("last_sync")
-        val HIDDEN_TABS_KEY = stringSetPreferencesKey("hidden_tabs")
+        // Hidden tabs feature removed - users can hide topics via kiosk/subscriptions now
+        val TAB_ORDER_KEY = stringPreferencesKey("tab_order")
     }
 
     val lastSync: Flow<Long> = context.dataStore.data.map { preferences ->
         preferences[LAST_SYNC_KEY] ?: 0L
     }
     
-    val hiddenTabs: Flow<Set<String>> = context.dataStore.data.map { preferences ->
-        preferences[HIDDEN_TABS_KEY] ?: emptySet()
+    // previous hiddenTabs removed
+
+    val tabOrder: Flow<List<String>> = context.dataStore.data.map { preferences ->
+        val json = preferences[TAB_ORDER_KEY]
+        if (json != null) {
+            val list = mutableListOf<String>()
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                list.add(arr.getString(i))
+            }
+            list
+        } else {
+            emptyList()
+        }
     }
 
     val theme: Flow<String> = context.dataStore.data.map { preferences ->
@@ -87,9 +101,11 @@ class SettingsRepository(private val context: Context) {
         }
     }
     
-    suspend fun setHiddenTabs(tabs: Set<String>) {
+    // setHiddenTabs removed
+    
+    suspend fun setTabOrder(order: List<String>) {
         context.dataStore.edit { preferences ->
-            preferences[HIDDEN_TABS_KEY] = tabs
+            preferences[TAB_ORDER_KEY] = JSONArray(order).toString()
         }
     }
 }
