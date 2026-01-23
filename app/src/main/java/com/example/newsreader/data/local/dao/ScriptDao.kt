@@ -21,6 +21,12 @@ interface ScriptDao {
     @Query("SELECT * FROM scripts WHERE :url LIKE '%' || domainMatch || '%' AND isEnabled = 1")
     suspend fun getScriptsForUrl(url: String): List<ScriptEntity>
 
+    @Query("SELECT * FROM scripts WHERE domainMatch = :domain LIMIT 1")
+    suspend fun getScriptByDomain(domain: String): ScriptEntity?
+
+    @Query("DELETE FROM scripts WHERE domainMatch = :domain")
+    suspend fun deleteByDomain(domain: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertScript(script: ScriptEntity)
 

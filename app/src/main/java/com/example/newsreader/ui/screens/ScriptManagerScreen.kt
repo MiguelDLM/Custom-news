@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import com.example.newsreader.data.local.entity.ScriptEntity
 import com.example.newsreader.data.repository.ScriptRepository
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +31,7 @@ fun ScriptManagerScreen(
     // State for the dialog
     var newDomain by remember { mutableStateOf(initialDomain ?: "") }
     var newCode by remember { mutableStateOf("") }
+    var foundScripts by remember { mutableStateOf<List<com.example.newsreader.data.repository.GreasyForkScriptSummary>>(emptyList()) }
 
     Scaffold(
         topBar = {
@@ -67,6 +70,55 @@ fun ScriptManagerScreen(
                     }
                 )
                 Divider()
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        // GreasyFork search UI
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = newDomain,
+                    onValueChange = { newDomain = it },
+                    label = { Text("Domain (e.g. example.com)") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = {
+                    // perform search
+                    scope.launch {
+                        val results = withContext(Dispatchers.IO) {
+                            if (newDomain.isBlank()) emptyList()
+                            else scriptRepository.searchGreasyForkForDomain(newDomain.trim())
+                        }
+                        foundScripts = results
+                    }
+                }) { Text("Search GreasyFork") }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("GreasyFork Results", style = MaterialTheme.typography.titleMedium)
+            LazyColumn {
+                items(foundScripts) { fs ->
+                    ListItem(
+                        headlineContent = { Text(fs.name) },
+                        supportingContent = { Text(fs.url) },
+                        trailingContent = {
+                            Row {
+                                IconButton(onClick = {
+                                    // fetch + add
+                                    scope.launch {
+                                        val code = withContext(Dispatchers.IO) { scriptRepository.fetchGreasyForkScriptCode(fs) }
+                                        if (!code.isNullOrBlank()) {
+                                            withContext(Dispatchers.IO) { scriptRepository.addOrUpdateScript(newDomain.trim(), code) }
+                                        }
+                                    }
+                                }) { Icon(Icons.Default.Add, contentDescription = "Add") }
+                            }
+                        }
+                    )
+                    Divider()
+                }
             }
         }
 
