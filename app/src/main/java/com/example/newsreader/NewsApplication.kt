@@ -5,12 +5,14 @@ import androidx.room.Room
 import com.example.newsreader.data.local.AppDatabase
 import com.example.newsreader.data.repository.NewsRepository
 import com.example.newsreader.data.repository.ScriptRepository
+import com.example.newsreader.data.repository.SettingsRepository
 import com.example.newsreader.util.RssParser
 
 class NewsApplication : Application() {
     lateinit var database: AppDatabase
     lateinit var newsRepository: NewsRepository
     lateinit var scriptRepository: ScriptRepository
+    lateinit var settingsRepository: SettingsRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -22,7 +24,14 @@ class NewsApplication : Application() {
         .build()
 
         val rssParser = RssParser()
-        newsRepository = NewsRepository(database.feedDao(), database.articleDao(), rssParser)
+        settingsRepository = SettingsRepository(applicationContext)
+        newsRepository = NewsRepository(
+            database.feedDao(), 
+            database.articleDao(), 
+            rssParser,
+            settingsRepository,
+            applicationContext
+        )
         scriptRepository = ScriptRepository(database.scriptDao())
     }
 }

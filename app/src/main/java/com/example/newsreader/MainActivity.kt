@@ -1,5 +1,6 @@
 package com.example.newsreader
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,6 +11,8 @@ import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -18,11 +21,13 @@ import com.example.newsreader.ui.screens.HomeScreen
 import com.example.newsreader.ui.screens.NewsstandScreen
 import com.example.newsreader.ui.screens.ReaderScreen
 import com.example.newsreader.ui.screens.ScriptManagerScreen
+import com.example.newsreader.ui.screens.SettingsScreen
 import com.example.newsreader.ui.theme.NewsReaderTheme
 import kotlinx.coroutines.runBlocking
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,18 +35,31 @@ class MainActivity : ComponentActivity() {
         
         val app = application as NewsApplication
         
-        // Check initial state synchronously for simplicity in this demo (ideally use ViewModel/SplashScreen)
-        val initialRoute = runBlocking {
-            if (app.newsRepository.getFeedCount() == 0) "newsstand" else "home"
-        }
-        
         setContent {
-            NewsReaderTheme {
+            val theme by app.settingsRepository.theme.collectAsState(initial = "system")
+            val language by app.settingsRepository.language.collectAsState(initial = "en")
+
+            // Apply Language
+            LaunchedEffect(language) {
+                val locale = Locale(language)
+                Locale.setDefault(locale)
+                val config = Configuration()
+                config.setLocale(locale)
+                baseContext.resources.updateConfiguration(config, baseContext.resources.displayMetrics)
+            }
+
+            // Determine Dark Mode
+            val darkTheme = when(theme) {
+                "light" -> false
+                "dark" -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
+            NewsReaderTheme(darkTheme = darkTheme) {
                 val navController = rememberNavController()
                 val currentBackStack by navController.currentBackStackEntryAsState()
                 val currentRoute = currentBackStack?.destination?.route
                 
-                // Routes that show bottom bar
                 val mainRoutes = listOf("home", "newsstand")
                 val showBottomBar = currentRoute in mainRoutes
 
@@ -50,8 +68,8 @@ class MainActivity : ComponentActivity() {
                         if (showBottomBar) {
                             NavigationBar {
                                 NavigationBarItem(
-                                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-                                    label = { Text("For You") },
+                                    icon = { Icon(Icons.Default.Home, contentDescription = stringResource(R.string.for_you)) },
+                                    label = { Text(stringResource(R.string.for_you)) },
                                     selected = currentRoute == "home",
                                     onClick = {
                                         navController.navigate("home") {
@@ -62,8 +80,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                                 NavigationBarItem(
-                                    icon = { Icon(Icons.Default.LibraryBooks, contentDescription = "Newsstand") },
-                                    label = { Text("Newsstand") },
+                                    icon = { Icon(Icons.Default.LibraryBooks, contentDescription = stringResource(R.string.newsstand)) },
+                                    label = { Text(stringResource(R.string.newsstand)) },
                                     selected = currentRoute == "newsstand",
                                     onClick = {
                                         navController.navigate("newsstand") {
@@ -79,7 +97,7 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = initialRoute,
+                        startDestination = "home", // Simplified start
                         modifier = Modifier.padding(innerPadding)
                     ) {
                         composable("home") {
@@ -91,12 +109,22 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onManageScriptsClick = {
                                     navController.navigate("scripts")
+                                },
+                                onSettingsClick = {
+                                    navController.navigate("settings")
                                 }
                             )
                         }
 
                         composable("newsstand") {
                             NewsstandScreen(newsRepository = app.newsRepository)
+                        }
+
+                        composable("settings") {
+                            SettingsScreen(
+                                settingsRepository = app.settingsRepository,
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         
                         composable(

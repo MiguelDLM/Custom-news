@@ -5,67 +5,106 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.newsreader.R
 import com.example.newsreader.data.local.entity.ArticleEntity
 import com.example.newsreader.data.repository.NewsRepository
-import kotlinx.coroutines.delay
+import com.example.newsreader.util.DateUtils
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.net.URI
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     newsRepository: NewsRepository,
     onArticleClick: (String) -> Unit,
+    onSettingsClick: () -> Unit,
     onManageScriptsClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
     // Data states
-    var feedsInitialized by remember { mutableStateOf(false) }
     val feeds by newsRepository.allFeeds.collectAsState(initial = emptyList())
-    
-    // Categories logic
-    val categories = remember(feeds) {
-        listOf("For You") + feeds.map { it.category }.distinct().sorted()
+    val hiddenTabs by newsRepository.hiddenTabs.collectAsState(initial = emptySet())
+    val whitelist by newsRepository.whitelist.collectAsState(initial = emptySet())
+
+    // Define all possible categories
+    val allCategories = remember(feeds) {
+        (listOf("For You") + feeds.map { it.category }.distinct().sorted())
     }
+    
+    // Filter hidden tabs
+    val visibleCategories = allCategories.filter { !hiddenTabs.contains(it) }
+    
+    // We need to map "For You" to localized string for display
+    val displayCategories = visibleCategories.map { 
+        when(it) {
+            "For You" -> stringResource(R.string.for_you)
+            "Politics" -> stringResource(R.string.politics)
+            "Technology" -> stringResource(R.string.technology)
+            "Sports" -> stringResource(R.string.sports)
+            "Finance" -> stringResource(R.string.finance)
+            "World" -> stringResource(R.string.world)
+            "General" -> stringResource(R.string.general)
+            else -> it
+        }
+    }
+    
     var selectedCategoryIndex by remember { mutableIntStateOf(0) }
     
-    // Articles flow based on selection
-    val currentCategory = categories.getOrElse(selectedCategoryIndex) { "For You" }
+    // Ensure index is valid if list shrinks
+    if (selectedCategoryIndex >= visibleCategories.size && visibleCategories.isNotEmpty()) {
+        selectedCategoryIndex = 0
+    }
     
-    // We observe the flow dynamically based on category
-    var articles by remember { mutableStateOf<List<ArticleEntity>>(emptyList()) }
+    val currentCategoryKey = visibleCategories.getOrElse(selectedCategoryIndex) { "For You" }
     
     // Search state
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     
+    // Sorting State
+    var sortByDate by remember { mutableStateOf(true) } // true = Date, false = Source
+    var showSortMenu by remember { mutableStateOf(false) }
+
+    // Articles State
+    var articles by remember { mutableStateOf<List<ArticleEntity>>(emptyList()) }
+    
     // Sync on start
     LaunchedEffect(Unit) {
-        newsRepository.syncFeeds()
+        newsRepository.checkSync()
     }
 
-    // Update articles when category changes or DB updates
-    LaunchedEffect(currentCategory, searchQuery) {
+    // Update articles logic
+    LaunchedEffect(currentCategoryKey, searchQuery, sortByDate, whitelist) {
         if (searchQuery.isNotEmpty()) {
-            articles = newsRepository.search(searchQuery)
+             // For search we just do a one-shot fetch for now or we could wrap in flow
+             val results = newsRepository.search(searchQuery) // Wildcards handled in Repo/Dao
+             articles = sortArticles(results, sortByDate)
         } else {
-             val flow = if (currentCategory == "For You") {
-                newsRepository.getAllArticles()
+            val flow = if (currentCategoryKey == "For You") {
+                newsRepository.getForYouArticles()
             } else {
-                newsRepository.getArticlesByCategory(currentCategory)
+                newsRepository.getArticlesByCategory(currentCategoryKey)
             }
+            
             flow.collect { list ->
-                articles = list
+                articles = sortArticles(list, sortByDate)
             }
         }
     }
@@ -79,43 +118,78 @@ fun HomeScreen(
                     onSearch = { },
                     active = true,
                     onActiveChange = { isSearchActive = it },
-                    placeholder = { Text("Search news...") },
-                    trailingIcon = { IconButton(onClick = { isSearchActive = false; searchQuery = "" }) { Icon(Icons.Default.Settings, "Close") } } // Just reusing icon for now
+                    placeholder = { Text(stringResource(R.string.search_hint)) },
+                    trailingIcon = { IconButton(onClick = { isSearchActive = false; searchQuery = "" }) { Icon(Icons.Default.Settings, "Close") } } 
                 ) {
-                   // Search results are handled in main content
+                   // Results in main content
                 }
             } else {
                 Column {
                     TopAppBar(
-                        title = { Text("Google News Clone") },
+                        title = { Text(stringResource(R.string.app_name)) },
                         actions = {
+                            // Sort Menu
+                            Box {
+                                IconButton(onClick = { showSortMenu = true }) {
+                                    Icon(Icons.Default.Sort, contentDescription = "Sort")
+                                }
+                                DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Date (Newest)") },
+                                        onClick = { sortByDate = true; showSortMenu = false }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Source (A-Z)") },
+                                        onClick = { sortByDate = false; showSortMenu = false }
+                                    )
+                                }
+                            }
                             IconButton(onClick = { isSearchActive = true }) {
                                 Icon(Icons.Default.Search, contentDescription = "Search")
                             }
                             IconButton(onClick = onManageScriptsClick) {
-                                Icon(Icons.Default.Settings, contentDescription = "Scripts")
+                                Icon(Icons.Default.Extension, contentDescription = stringResource(R.string.script_manager))
+                            }
+                             IconButton(onClick = onSettingsClick) {
+                                Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                             }
                         }
                     )
-                    ScrollableTabRow(selectedTabIndex = selectedCategoryIndex) {
-                        categories.forEachIndexed { index, title ->
-                            Tab(
-                                selected = selectedCategoryIndex == index,
-                                onClick = { selectedCategoryIndex = index; searchQuery = "" },
-                                text = { Text(title) }
-                            )
+                    if (displayCategories.isNotEmpty()) {
+                        ScrollableTabRow(selectedTabIndex = selectedCategoryIndex) {
+                            displayCategories.forEachIndexed { index, title ->
+                                Tab(
+                                    selected = selectedCategoryIndex == index,
+                                    onClick = { selectedCategoryIndex = index; searchQuery = "" },
+                                    text = { Text(title) }
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     ) { padding ->
-        if (articles.isEmpty()) {
+        if (visibleCategories.isEmpty() && feeds.isEmpty()) {
+             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                 Text(stringResource(R.string.no_subscriptions))
+             }
+        } else if (currentCategoryKey == "For You" && articles.isEmpty() && searchQuery.isEmpty()) {
+             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                     Text("No topics of interest found.")
+                     Spacer(modifier = Modifier.height(8.dp))
+                     Button(onClick = onSettingsClick) {
+                         Text("Add Interests")
+                     }
+                 }
+             }
+        } else if (articles.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                if (feeds.isEmpty()) {
-                     Text("No sources yet. Go to Newsstand tab.")
+                if (searchQuery.isNotEmpty()) {
+                     Text("No results for '$searchQuery'")
                 } else {
-                     CircularProgressIndicator() // Or empty state
+                     CircularProgressIndicator() 
                 }
             }
         } else {
@@ -125,27 +199,64 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(articles) { article ->
-                    NewsCard(article = article, onClick = { onArticleClick(article.link) })
+                    NewsCard(
+                        article = article, 
+                        onClick = { onArticleClick(article.link) },
+                        sourceName = getDomainName(article.link)
+                    )
                 }
             }
         }
     }
 }
 
+fun sortArticles(list: List<ArticleEntity>, byDate: Boolean): List<ArticleEntity> {
+    return if (byDate) {
+        list.sortedByDescending { it.pubDateMillis }
+    } else {
+        list.sortedBy { getDomainName(it.link) }
+    }
+}
+
+fun getDomainName(url: String): String {
+    return try {
+        val domain = URI(url).host
+        domain.removePrefix("www.")
+    } catch (e: Exception) {
+        ""
+    }
+}
+
 @Composable
-fun NewsCard(article: ArticleEntity, onClick: () -> Unit) {
+fun NewsCard(article: ArticleEntity, onClick: () -> Unit, sourceName: String) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
             if (article.imageUrl != null) {
-                AsyncImage(
-                    model = article.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().height(200.dp),
-                    contentScale = ContentScale.Crop
-                )
+                Box {
+                    AsyncImage(
+                        model = article.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxWidth().height(200.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                    // Source overlay
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.padding(8.dp).align(Alignment.BottomStart)
+                    ) {
+                        Text(
+                            text = sourceName,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
             }
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -154,13 +265,28 @@ fun NewsCard(article: ArticleEntity, onClick: () -> Unit) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (article.pubDate != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = article.pubDate,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (article.imageUrl == null) {
+                            Text(
+                                text = sourceName,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        if (article.pubDateMillis > 0) {
+                            Text(
+                                text = DateUtils.getTimeAgo(article.pubDateMillis, context),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                    // Share button moved to Reader
                 }
             }
         }

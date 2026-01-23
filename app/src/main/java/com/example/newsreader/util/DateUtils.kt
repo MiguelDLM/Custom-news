@@ -1,5 +1,7 @@
 package com.example.newsreader.util
 
+import android.content.Context
+import com.example.newsreader.R
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -22,5 +24,26 @@ object DateUtils {
             }
         }
         return System.currentTimeMillis() // Fallback
+    }
+
+    fun getTimeAgo(timestamp: Long, context: Context): String {
+        val now = System.currentTimeMillis()
+        val diff = now - timestamp
+        
+        val seconds = diff / 1000
+        val minutes = seconds / 60
+        val hours = minutes / 60
+        val days = hours / 24
+
+        return when {
+            minutes < 1 -> "Just now" // Fallback string, usually localized better
+            minutes < 60 -> "$minutes min"
+            hours < 24 -> "$hours h"
+            days < 7 -> "$days d"
+            else -> {
+                val sdf = SimpleDateFormat("dd MMM", Locale.getDefault())
+                sdf.format(timestamp)
+            }
+        }
     }
 }
