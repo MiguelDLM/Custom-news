@@ -134,7 +134,17 @@ class RssParser {
     }
 
     private fun cleanHtml(html: String?): String? {
-        // Simple HTML stripping
-        return html?.replace(Regex("<.*?>"), "")?.replace("&nbsp;", " ")?.trim()
+        // Robust HTML stripping and entity decoding
+        if (html == null) return null
+        var text = html.replace(Regex("<script.*?</script>", RegexOption.DOT_MATCHES_ALL), "")
+        text = text.replace(Regex("<style.*?</style>", RegexOption.DOT_MATCHES_ALL), "")
+        text = text.replace(Regex("<.*?>"), "")
+        text = text.replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+        return text.trim()
     }
 }

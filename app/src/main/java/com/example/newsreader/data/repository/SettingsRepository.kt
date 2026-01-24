@@ -23,6 +23,10 @@ class SettingsRepository(private val context: Context) {
         val LAST_SYNC_KEY = longPreferencesKey("last_sync")
         // Hidden tabs feature removed - users can hide topics via kiosk/subscriptions now
         val TAB_ORDER_KEY = stringPreferencesKey("tab_order")
+        
+        // AdBlocker
+        val ADBLOCK_ENABLED_LISTS_KEY = stringSetPreferencesKey("adblock_enabled_lists")
+        val ADBLOCK_CUSTOM_LISTS_KEY = stringSetPreferencesKey("adblock_custom_lists")
     }
 
     val lastSync: Flow<Long> = context.dataStore.data.map { preferences ->
@@ -63,6 +67,19 @@ class SettingsRepository(private val context: Context) {
 
     val keywordBlacklist: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[KEYWORD_BLACKLIST_KEY] ?: emptySet()
+    }
+    
+    // AdBlocker
+    val adBlockEnabledLists: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        // Default: StevenBlack and OISD
+        preferences[ADBLOCK_ENABLED_LISTS_KEY] ?: setOf(
+            "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+            "https://oisd.nl/domainswild"
+        )
+    }
+
+    val adBlockCustomLists: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[ADBLOCK_CUSTOM_LISTS_KEY] ?: emptySet()
     }
 
     suspend fun setTheme(theme: String) {
@@ -106,6 +123,18 @@ class SettingsRepository(private val context: Context) {
     suspend fun setTabOrder(order: List<String>) {
         context.dataStore.edit { preferences ->
             preferences[TAB_ORDER_KEY] = JSONArray(order).toString()
+        }
+    }
+    
+    suspend fun setAdBlockEnabledLists(lists: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[ADBLOCK_ENABLED_LISTS_KEY] = lists
+        }
+    }
+
+    suspend fun setAdBlockCustomLists(lists: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[ADBLOCK_CUSTOM_LISTS_KEY] = lists
         }
     }
 }

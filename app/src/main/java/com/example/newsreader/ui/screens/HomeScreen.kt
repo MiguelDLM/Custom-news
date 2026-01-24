@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +36,8 @@ import com.example.newsreader.util.DateUtils
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.net.URI
+
+import com.example.newsreader.data.local.entity.Category
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,9 +59,12 @@ fun HomeScreen(
     
     val tabOrder by newsRepository.tabOrder.collectAsState(initial = emptyList())
     
-    // Define all possible categories
+    // Define all possible categories (as strings for display/tabs)
+    // We map internal Category enums to localized display strings or simple names
     val allCategories = remember(feeds, tabOrder) {
-        val rawCategories = (listOf("For You") + feeds.map { it.category }.distinct().sorted())
+        // Collect all categories from feeds (flatten list of categories)
+        val rawCategories = (listOf("For You") + feeds.flatMap { it.categories }.map { it.name }.distinct().sorted())
+        
         // Apply custom order if exists
         if (tabOrder.isNotEmpty()) {
             val ordered = tabOrder.filter { rawCategories.contains(it) }
@@ -71,20 +77,6 @@ fun HomeScreen(
     
     // Filter hidden tabs
     val visibleCategories = allCategories.filter { !hiddenTabs.contains(it) }
-    
-    // We need to map "For You" to localized string for display
-    val displayCategories = visibleCategories.map { 
-        when(it) {
-            "For You" -> stringResource(R.string.for_you)
-            "Politics" -> stringResource(R.string.politics)
-            "Technology" -> stringResource(R.string.technology)
-            "Sports" -> stringResource(R.string.sports)
-            "Finance" -> stringResource(R.string.finance)
-            "World" -> stringResource(R.string.world)
-            "General" -> stringResource(R.string.general)
-            else -> it
-        }
-    }
     
     var selectedCategoryIndex by remember { mutableIntStateOf(0) }
     
@@ -219,15 +211,12 @@ fun HomeScreen(
                             IconButton(onClick = { isSearchActive = true }) {
                                 Icon(Icons.Default.Search, contentDescription = "Search")
                             }
-                            IconButton(onClick = onManageScriptsClick) {
-                                Icon(Icons.Default.Extension, contentDescription = stringResource(R.string.script_manager))
-                            }
                              IconButton(onClick = onSettingsClick) {
                                 Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                             }
                         }
                     )
-                    if (displayCategories.isNotEmpty()) {
+                    if (visibleCategories.isNotEmpty()) {
                         // Simple, stable tabs bar. Reordering is available from Settings only.
                         val tabs = visibleCategories
                         if (tabs.isEmpty()) {
@@ -240,12 +229,12 @@ fun HomeScreen(
                             tabs.forEachIndexed { index, key ->
                                 val title = when (key) {
                                     "For You" -> stringResource(R.string.for_you)
-                                    "Politics" -> stringResource(R.string.politics)
-                                    "Technology" -> stringResource(R.string.technology)
-                                    "Sports" -> stringResource(R.string.sports)
-                                    "Finance" -> stringResource(R.string.finance)
-                                    "World" -> stringResource(R.string.world)
-                                    "General" -> stringResource(R.string.general)
+                                    "Politics", "POLITICS" -> stringResource(R.string.politics)
+                                    "Technology", "TECHNOLOGY" -> stringResource(R.string.technology)
+                                    "Sports", "SPORTS" -> stringResource(R.string.sports)
+                                    "Finance", "FINANCE" -> stringResource(R.string.finance)
+                                    "World", "WORLD" -> stringResource(R.string.world)
+                                    "General", "GENERAL" -> stringResource(R.string.general)
                                     else -> key
                                 }
 
@@ -261,6 +250,8 @@ fun HomeScreen(
             }
         }
     ) { padding ->
+
+
         if (visibleCategories.isEmpty() && feeds.isEmpty()) {
              Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                  Text(stringResource(R.string.no_subscriptions))
@@ -289,11 +280,38 @@ fun HomeScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(articles) { article ->
-                    NewsCard(
-                        article = article, 
-                        onClick = { onArticleClick(article.link) },
-                        sourceName = getDomainName(article.link)
+                items(articles, key = { it.id }) { article ->
+                    val dismissState = rememberDismissState(
+                        confirmValueChange = {
+                            if (it != DismissValue.Default) {
+                                scope.launch { 
+                                    newsRepository.hideArticle(article.id)
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                    )
+
+                    SwipeToDismiss(
+                        state = dismissState,
+                        background = {
+                            Box(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Hide")
+                            }
+                        },
+                        dismissContent = {
+                            NewsCard(
+                                article = article, 
+                                onClick = { onArticleClick(article.link) },
+                                sourceName = getDomainName(article.link)
+                            )
+                        },
+                        directions = setOf(DismissDirection.EndToStart)
                     )
                 }
             }

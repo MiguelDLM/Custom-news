@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.newsreader.R
+import com.example.newsreader.data.local.entity.Category
 import com.example.newsreader.data.local.entity.FeedEntity
 import com.example.newsreader.data.repository.NewsRepository
 import com.example.newsreader.data.repository.SuggestedFeed
@@ -72,7 +73,7 @@ fun NewsstandScreen(
                     Card {
                         ListItem(
                             headlineContent = { Text(feed.title) },
-                            supportingContent = { Text(feed.category) },
+                            supportingContent = { Text(feed.categories.joinToString(", ") { it.name }) },
                             trailingContent = {
                                 IconButton(onClick = { scope.launch { newsRepository.deleteFeed(feed) } }) {
                                     Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.unsubscribe))
@@ -95,22 +96,16 @@ fun NewsstandScreen(
             // Group suggestions
             val suggestions = newsRepository.suggestedFeeds
             val groups = if (groupByCountry) {
-                suggestions.groupBy { 
-                    when(it.country) {
-                        "MX" -> "Mexico"
-                        "US" -> "United States"
-                        "ES" -> "Spain"
-                        else -> it.country
-                    }
-                }
+                suggestions.groupBy { it.country }
             } else {
-                suggestions.groupBy { it.category }
+                // Group by the first category for simplicity in this view
+                suggestions.groupBy { it.categories.firstOrNull()?.name ?: "General" }
             }
 
             groups.forEach { (groupName, groupFeeds) ->
                 item {
-                    ExpandableGroup(title = groupName, feeds = groupFeeds, currentFeeds = feeds, onAdd = { url, title, cat ->
-                        scope.launch { newsRepository.addFeed(url, title, cat) }
+                    ExpandableGroup(title = groupName, feeds = groupFeeds, currentFeeds = feeds, onAdd = { url, title, cats, country ->
+                        scope.launch { newsRepository.addFeed(url, title, cats, country) }
                     })
                 }
             }
@@ -119,9 +114,11 @@ fun NewsstandScreen(
         if (showAddDialog) {
             AddFeedDialog(
                 onDismiss = { showAddDialog = false },
-                onAdd = { title, url, category ->
+                onAdd = { title, url, categoryName ->
                     scope.launch {
-                        newsRepository.addFeed(url, title, category)
+                        // For custom feeds, we just assume General category and Global country for now, or we could add more inputs
+                        val cats = listOf(Category.fromString(categoryName))
+                        newsRepository.addFeed(url, title, cats, "Global")
                         showAddDialog = false
                     }
                 }
@@ -135,7 +132,7 @@ fun ExpandableGroup(
     title: String, 
     feeds: List<SuggestedFeed>, 
     currentFeeds: List<FeedEntity>,
-    onAdd: (String, String, String) -> Unit
+    onAdd: (String, String, List<Category>, String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -171,10 +168,13 @@ fun ExpandableGroup(
                 ) {
                     ListItem(
                         headlineContent = { Text(feed.title) },
-                        supportingContent = { Text("${feed.category} • ${feed.country}") },
+                        supportingContent = { 
+                            val cats = feed.categories.joinToString(", ") { it.name }
+                            Text("$cats • ${feed.country}") 
+                        },
                         trailingContent = {
                             if (!isSubscribed) {
-                                Button(onClick = { onAdd(feed.url, feed.title, feed.category) }) {
+                                Button(onClick = { onAdd(feed.url, feed.title, feed.categories, feed.country) }) {
                                     Text(stringResource(R.string.add))
                                 }
                             } else {

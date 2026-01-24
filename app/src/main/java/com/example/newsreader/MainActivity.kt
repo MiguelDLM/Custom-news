@@ -123,7 +123,8 @@ class MainActivity : ComponentActivity() {
                         composable("settings") {
                             SettingsScreen(
                                 settingsRepository = app.settingsRepository,
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                onScriptManagerClick = { navController.navigate("scripts") }
                             )
                         }
                         

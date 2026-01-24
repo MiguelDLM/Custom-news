@@ -7,8 +7,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.newsreader.data.local.entity.ScriptEntity
@@ -54,70 +56,117 @@ fun ScriptManagerScreen(
             }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize()
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
         ) {
-            items(scripts) { script ->
-                ListItem(
-                    headlineContent = { Text(script.domainMatch) },
-                    supportingContent = { Text(script.jsCode, maxLines = 1) },
-                    trailingContent = {
-                        IconButton(onClick = {
-                            scope.launch { scriptRepository.deleteScript(script) }
-                        }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete")
-                        }
-                    }
-                )
-                Divider()
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        // GreasyFork search UI
-        Column(modifier = Modifier.padding(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = newDomain,
-                    onValueChange = { newDomain = it },
-                    label = { Text("Domain (e.g. example.com)") },
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = {
-                    // perform search
-                    scope.launch {
-                        val results = withContext(Dispatchers.IO) {
-                            if (newDomain.isBlank()) emptyList()
-                            else scriptRepository.searchGreasyForkForDomain(newDomain.trim())
-                        }
-                        foundScripts = results
-                    }
-                }) { Text("Search GreasyFork") }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("GreasyFork Results", style = MaterialTheme.typography.titleMedium)
-            LazyColumn {
-                items(foundScripts) { fs ->
-                    ListItem(
-                        headlineContent = { Text(fs.name) },
-                        supportingContent = { Text(fs.url) },
-                        trailingContent = {
-                            Row {
-                                IconButton(onClick = {
-                                    // fetch + add
-                                    scope.launch {
-                                        val code = withContext(Dispatchers.IO) { scriptRepository.fetchGreasyForkScriptCode(fs) }
-                                        if (!code.isNullOrBlank()) {
-                                            withContext(Dispatchers.IO) { scriptRepository.addOrUpdateScript(newDomain.trim(), code) }
-                                        }
-                                    }
-                                }) { Icon(Icons.Default.Add, contentDescription = "Add") }
-                            }
-                        }
+            // GreasyFork search UI at the top
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = newDomain,
+                        onValueChange = { newDomain = it },
+                        label = { Text("Domain (e.g. example.com)") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
                     )
-                    Divider()
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = {
+                        scope.launch {
+                            val results = withContext(Dispatchers.IO) {
+                                if (newDomain.isBlank()) emptyList()
+                                else scriptRepository.searchGreasyForkForDomain(newDomain.trim())
+                            }
+                            foundScripts = results
+                        }
+                    }) { Text("Search") }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.weight(1f)
+            ) {
+                // Results Section
+                if (foundScripts.isNotEmpty()) {
+                    item {
+                        Text(
+                            "GreasyFork Results",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    items(foundScripts) { fs ->
+                        ListItem(
+                            headlineContent = { Text(fs.name) },
+                            supportingContent = { 
+                                Column {
+                                    Text("v${fs.version} • ${fs.authors} • ${fs.updatedAt}", style = MaterialTheme.typography.labelSmall)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(fs.description, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                }
+                            },
+                            trailingContent = {
+                                var isLoading by remember { mutableStateOf(false) }
+                                var isInstalled by remember { mutableStateOf(false) }
+                                
+                                if (isLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                } else if (isInstalled) {
+                                    Icon(Icons.Default.Check, contentDescription = "Installed", tint = MaterialTheme.colorScheme.primary)
+                                } else {
+                                    IconButton(onClick = {
+                                        isLoading = true
+                                        scope.launch {
+                                            val code = withContext(Dispatchers.IO) { scriptRepository.fetchGreasyForkScriptCode(fs) }
+                                            if (!code.isNullOrBlank()) {
+                                                withContext(Dispatchers.IO) { scriptRepository.addOrUpdateScript(newDomain.trim(), code) }
+                                                isInstalled = true
+                                                // Optional: Show snackbar
+                                            } else {
+                                                // Show error
+                                            }
+                                            isLoading = false
+                                        }
+                                    }) { Icon(Icons.Default.Add, contentDescription = "Add") }
+                                }
+                            }
+                        )
+                        Divider()
+                    }
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+
+                // Installed Scripts Section
+                item {
+                    Text(
+                        "Installed Scripts",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+                
+                if (scripts.isEmpty()) {
+                    item {
+                        Text("No scripts installed", modifier = Modifier.padding(16.dp))
+                    }
+                } else {
+                    items(scripts) { script ->
+                        ListItem(
+                            headlineContent = { Text(script.domainMatch) },
+                            supportingContent = { Text(script.jsCode.take(50).replace("\n", " ") + "...") },
+                            trailingContent = {
+                                IconButton(onClick = {
+                                    scope.launch { scriptRepository.deleteScript(script) }
+                                }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                                }
+                            }
+                        )
+                        Divider()
+                    }
                 }
             }
         }

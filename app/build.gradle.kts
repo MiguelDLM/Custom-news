@@ -76,6 +76,11 @@ dependencies {
     // Images
     implementation("io.coil-kt:coil-compose:2.5.0")
 
+    // JSON
+    implementation("com.google.code.gson:gson:2.10.1")
+    // HTML Parsing
+    implementation("org.jsoup:jsoup:1.17.2")
+
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 

@@ -27,5 +27,6 @@ data class ArticleEntity(
     val pubDate: String?,
     val pubDateMillis: Long = 0, // For sorting
     val isSaved: Boolean = false,
+    val isHidden: Boolean = false, // New field for hidden articles
     val category: String = "General" // Denormalized for easier querying
 )
