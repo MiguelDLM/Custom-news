@@ -24,17 +24,24 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build with Gradle
-      run: ./gradlew build
+    - name: Decode Keystore
+      env:
+        ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      run: |
+        echo $ANDROID_KEYSTORE_BASE64 | base64 --decode > ${{ github.workspace }}/upload-keystore.jks
+        echo "storeFile=${{ github.workspace }}/upload-keystore.jks" > keystore.properties
+        echo "storePassword=$ANDROID_STORE_PASSWORD" >> keystore.properties
+        echo "keyAlias=$ANDROID_KEY_ALIAS" >> keystore.properties
+        echo "keyPassword=$ANDROID_KEY_PASSWORD" >> keystore.properties
 
-    - name: Upload Debug APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+    - name: Build with Gradle
+      run: ./gradlew assembleRelease
 
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
-        name: app-release-unsigned
-        path: app/build/outputs/apk/release/app-release-unsigned.apk
+        name: app-release
+        path: app/build/outputs/apk/release/app-release.apk
