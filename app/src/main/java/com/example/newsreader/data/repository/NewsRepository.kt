@@ -2,6 +2,7 @@ package com.example.newsreader.data.repository
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -183,6 +184,7 @@ class NewsRepository(
         }
     }
     
+    @SuppressLint("MissingPermission")
     private fun sendNotification(title: String) {
         val channelId = "news_channel"
         val notificationId = title.hashCode()
