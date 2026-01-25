@@ -34,6 +34,14 @@ android {
                 storePassword = props.getProperty("storePassword")
                 keyAlias = props.getProperty("keyAlias")
                 keyPassword = props.getProperty("keyPassword")
+            } else {
+                val keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+                if (keystoreFile != null) {
+                    storeFile = file(keystoreFile)
+                    storePassword = System.getenv("ANDROID_STORE_PASSWORD")
+                    keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                    keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+                }
             }
         }
     }
