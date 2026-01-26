@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +38,20 @@ fun ReaderScreen(
     var availableScriptsCount by remember { mutableStateOf(0) }
     var showSuggestionBanner by remember { mutableStateOf(false) }
     
+    // Reader Mode State
+    var isReaderMode by remember { mutableStateOf(true) }
+    var readabilityScript by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                readabilityScript = context.assets.open("readability.js").bufferedReader().use { it.readText() }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
     LaunchedEffect(domain) {
         if (domain.isNotBlank()) {
             val count = withContext(Dispatchers.IO) {
@@ -54,11 +70,18 @@ fun ReaderScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(domain.ifBlank { "Reading" }, style = MaterialTheme.typography.titleMedium) },
+                title = { Text(domain.ifBlank { stringResource(R.string.reading) }, style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
                 },
                 actions = {
+                    IconButton(onClick = { isReaderMode = !isReaderMode }) {
+                        Icon(
+                            if (isReaderMode) Icons.Default.Public else Icons.Default.Description,
+                            contentDescription = if (isReaderMode) "View Original" else "Reader Mode"
+                        )
+                    }
+                    
                     IconButton(onClick = {
                         val sendIntent = android.content.Intent().apply {
                             action = android.content.Intent.ACTION_SEND
@@ -85,7 +108,9 @@ fun ReaderScreen(
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             ScriptableWebView(
                 url = url,
-                scriptRepository = scriptRepository
+                scriptRepository = scriptRepository,
+                isReaderMode = isReaderMode,
+                readabilityScript = readabilityScript
             )
             
             // Non-invasive Banner
@@ -103,7 +128,7 @@ fun ReaderScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Scripts available ($availableScriptsCount)",
+                            text = stringResource(R.string.script_suggestion_banner, availableScriptsCount),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )

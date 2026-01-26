@@ -1,4 +1,4 @@
-# Custom News Reader
+# Strogoff
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/MiguelDLM/Custom-news?label=Última%20Versión)](https://github.com/MiguelDLM/Custom-news/releases/latest)
 [![GitHub top language](https://img.shields.io/github/languages/top/MiguelDLM/Custom-news)](https://github.com/MiguelDLM/Custom-news)
@@ -6,7 +6,13 @@
 
 [**Read in English**](README.md)
 
-Un lector de noticias RSS/Atom moderno, ligero y centrado en la privacidad para Android. Desarrollado con Jetpack Compose, ofrece una experiencia de lectura fluida con soporte offline y control total sobre tus fuentes de noticias.
+ Strogoff es un lector de noticias RSS/Atom moderno, ligero y centrado en la privacidad para Android. Desarrollado con Jetpack Compose, ofrece una experiencia de lectura fluida con soporte offline y control total sobre tus fuentes de noticias.
+
+ Cambios incluidos en esta actualización:
+ - Modo de lectura (por defecto) que muestra el artículo completo extraído del sitio cuando el feed solo proporciona un resumen.
+ - El parseo del HTML se ejecuta después de los scripts personalizados que inyecte el usuario para que puedan modificar la página antes de la extracción (útil para saltar muros de pago o cargar contenido diferido).
+ - Mejora en la búsqueda de scripts en GreasyFork: coincidencia más estricta por host, mejor manejo de subdominios y filtrado para evitar resultados genéricos no relacionados.
+ - Mejoras de localización para 'Leyendo' y el banner de sugerencia de scripts.
 
 ## Características
 

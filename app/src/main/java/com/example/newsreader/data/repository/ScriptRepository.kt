@@ -50,58 +50,75 @@ class ScriptRepository(private val scriptDao: ScriptDao) {
 
     // Search GreasyFork for a script matching a domain. Returns possible scripts.
     fun searchGreasyForkForDomain(domain: String): List<GreasyForkScriptSummary> {
-        // Strip subdomains aggressively to find results (e.g. cultura.elpais.com -> elpais.com)
-        val searchTerms = mutableSetOf<String>()
-        var current = domain
-        searchTerms.add(current)
-        while (current.contains(".") && current.indexOf(".") != current.lastIndexOf(".")) {
-            current = current.substring(current.indexOf(".") + 1)
-            searchTerms.add(current)
-        }
-        
-        // Also try specific standard variations if not covered
-        if (domain.startsWith("www.")) {
-            searchTerms.add(domain.removePrefix("www."))
+        // Prefer exact host and root domain lookups via the by-site endpoint.
+        // Only fall back to generic search when site-specific results are missing,
+        // and then apply stricter filtering to avoid unrelated matches for common words.
+        val hostsToTry = mutableListOf<String>()
+        var host = domain.trim().lowercase()
+        if (host.startsWith("www.")) host = host.removePrefix("www.")
+        hostsToTry.add(host)
+
+        // Also try root (remove first subdomain if present): e.g. cultura.elpais.com -> elpais.com
+        val dotIndex = host.indexOf('.')
+        if (dotIndex != -1) {
+            val root = host.substring(dotIndex + 1)
+            if (root.isNotBlank() && root != host) hostsToTry.add(root)
         }
 
         val allResults = mutableListOf<GreasyForkScriptSummary>()
-        
+
         try {
-            // Add User-Agent to avoid being blocked
             val reqBuilder = Request.Builder().header("User-Agent", "NewsReaderScriptable/1.0")
 
-            searchTerms.forEach { term ->
-                val q = URLEncoder.encode(term, "UTF-8")
-                // Try specific site endpoint first (usually cleaner)
-                val bySiteUrl = "https://greasyfork.org/scripts/by-site/$q.json" // Removed /en/
-                
+            // First try the site-specific endpoint for each candidate host.
+            hostsToTry.forEach { h ->
+                val q = URLEncoder.encode(h, "UTF-8")
+                val bySiteUrl = "https://greasyfork.org/scripts/by-site/$q.json"
                 try {
                     val req = reqBuilder.url(bySiteUrl).build()
                     http.newCall(req).execute().use { resp ->
                         if (resp.isSuccessful) {
                             val body = resp.body?.string()
-                            if (body != null) {
-                                allResults.addAll(parseGreasyForkJson(body))
+                            if (!body.isNullOrEmpty()) {
+                                val parsed = parseGreasyForkJson(body)
+                                if (parsed.isNotEmpty()) {
+                                    allResults.addAll(parsed)
+                                }
                             }
                         }
                     }
-                } catch (e: Exception) { /* ignore */ }
-                
-                // Also generic search for more obscure matches
-                val searchUrl = "https://greasyfork.org/scripts.json?q=$q"
-                try {
-                    val req = reqBuilder.url(searchUrl).build()
-                    http.newCall(req).execute().use { resp ->
-                        if (resp.isSuccessful) {
-                            val body = resp.body?.string()
-                            if (body != null) {
-                                allResults.addAll(parseGreasyForkJson(body))
-                            }
-                        }
-                    }
-                } catch (e: Exception) { /* ignore */ }
+                } catch (e: Exception) { /* ignore site lookup errors */ }
             }
-            
+
+            // If we found site-specific scripts, return those (they are the most relevant)
+            if (allResults.isNotEmpty()) return allResults.distinctBy { it.id }
+
+            // Otherwise, fall back to generic search but with stricter filtering.
+            // Only query once per the most specific host (avoid flooding GreasyFork).
+            val primary = URLEncoder.encode(hostsToTry.first(), "UTF-8")
+            val searchUrl = "https://greasyfork.org/scripts.json?q=$primary"
+            try {
+                val req = reqBuilder.url(searchUrl).build()
+                http.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string()
+                        if (!body.isNullOrEmpty()) {
+                            val genericResults = parseGreasyForkJson(body)
+                            // Filter: script must mention the host/root in name, description or code url
+                            val filtered = genericResults.filter { gs ->
+                                val lowerName = gs.name.lowercase()
+                                val lowerDesc = gs.description.lowercase()
+                                val lowerUrl = gs.url.lowercase()
+                                hostsToTry.any { h ->
+                                    lowerName.contains(h) || lowerDesc.contains(h) || lowerUrl.contains(h)
+                                }
+                            }
+                            allResults.addAll(filtered)
+                        }
+                    }
+                }
+            } catch (e: Exception) { /* ignore */ }
+
             return allResults.distinctBy { it.id }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -132,7 +149,7 @@ class ScriptRepository(private val scriptDao: ScriptDao) {
                 // Construct script page URL or code URL
                 // Note: The API returns 'code_url' which is the direct link to the .user.js
                 // We prefer fetching code via this URL if available, otherwise construct page url
-                val urlToFetch = codeUrl ?: "https://greasyfork.org/scripts/$id/code/script.user.js"
+                val urlToFetch = codeUrl ?: (item["url"] as? String) ?: "https://greasyfork.org/scripts/$id/code/script.user.js"
                 
                 GreasyForkScriptSummary(
                     id = id, 

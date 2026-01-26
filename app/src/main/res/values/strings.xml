@@ -42,5 +42,6 @@
     <string name="save">Save</string>
     <string name="script_manager">Script Manager</string>
     <string name="reading">Reading</string>
+    <string name="script_suggestion_banner">Scripts available (%1$d)</string>
     <string name="inject_script">Inject Script</string>
 </resources>

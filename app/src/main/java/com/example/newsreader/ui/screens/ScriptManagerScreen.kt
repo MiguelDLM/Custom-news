@@ -35,10 +35,20 @@ fun ScriptManagerScreen(
     var newCode by remember { mutableStateOf("") }
     var foundScripts by remember { mutableStateOf<List<com.example.newsreader.data.repository.GreasyForkScriptSummary>>(emptyList()) }
 
+    // Auto-search if domain provided
+    LaunchedEffect(initialDomain) {
+        if (!initialDomain.isNullOrBlank()) {
+             val results = withContext(Dispatchers.IO) {
+                  scriptRepository.searchGreasyForkForDomain(initialDomain.trim())
+             }
+             foundScripts = results
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Script Manager") },
+                title = { Text(if (!initialDomain.isNullOrBlank()) "Scripts for $initialDomain" else "Script Manager") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -48,7 +58,7 @@ fun ScriptManagerScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { 
-                newDomain = ""
+                newDomain = initialDomain ?: ""
                 newCode = ""
                 showAddDialog = true 
             }) {
@@ -61,29 +71,6 @@ fun ScriptManagerScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            // GreasyFork search UI at the top
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = newDomain,
-                        onValueChange = { newDomain = it },
-                        label = { Text("Domain (e.g. example.com)") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = {
-                        scope.launch {
-                            val results = withContext(Dispatchers.IO) {
-                                if (newDomain.isBlank()) emptyList()
-                                else scriptRepository.searchGreasyForkForDomain(newDomain.trim())
-                            }
-                            foundScripts = results
-                        }
-                    }) { Text("Search") }
-                }
-            }
-
             LazyColumn(
                 modifier = Modifier.weight(1f)
             ) {
@@ -120,11 +107,8 @@ fun ScriptManagerScreen(
                                         scope.launch {
                                             val code = withContext(Dispatchers.IO) { scriptRepository.fetchGreasyForkScriptCode(fs) }
                                             if (!code.isNullOrBlank()) {
-                                                withContext(Dispatchers.IO) { scriptRepository.addOrUpdateScript(newDomain.trim(), code) }
+                                                withContext(Dispatchers.IO) { scriptRepository.addOrUpdateScript(initialDomain ?: newDomain.trim(), code) }
                                                 isInstalled = true
-                                                // Optional: Show snackbar
-                                            } else {
-                                                // Show error
                                             }
                                             isLoading = false
                                         }

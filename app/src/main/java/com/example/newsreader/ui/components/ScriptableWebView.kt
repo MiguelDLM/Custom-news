@@ -16,16 +16,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun ScriptableWebView(
     url: String,
-    scriptRepository: ScriptRepository
+    scriptRepository: ScriptRepository,
+    isReaderMode: Boolean = false,
+    readabilityScript: String = ""
 ) {
     val scope = rememberCoroutineScope()
     
     // Init AdBlocker (using defaults if not configured, or ideally inject settings repo to get lists)
-    // For simplicity in this view component, we'll just init with defaults or rely on Repository init elsewhere.
-    // Ideally AdBlocker.init() should be called in Application or MainActivity with proper lists.
-    // We'll call reload with empty extra lists for now to ensure it's up, but better logic is in Main.
-    // Actually, let's just make init optional or parameterless for default behavior if already inited.
-    // We changed init signature. Let's fix AdBlocker.kt first to allow parameterless init for defaults.
     LaunchedEffect(Unit) {
         // We will assume it's initialized by MainActivity or we pass empty sets for defaults
         AdBlocker.init(emptySet(), emptySet()) 
@@ -53,12 +50,49 @@ fun ScriptableWebView(
                         url?.let { currentUrl ->
                             scope.launch {
                                 try {
+                                    // 1. Execute User Scripts first so they can modify the DOM (remove paywalls,
+                                    //    lazy-load content, etc.). These run in the page context.
                                     val scripts = scriptRepository.getScriptsForUrl(currentUrl)
                                     scripts.forEach { script ->
-                                        // Execute user script
-                                        // We wrap it in a function to isolate scope slightly
                                         val safeScript = "(function() { ${script.jsCode} })();"
-                                        view?.evaluateJavascript(safeScript, null)
+                                        try {
+                                            view?.evaluateJavascript(safeScript, null)
+                                        } catch (e: Exception) {
+                                            // Ignore individual script errors to avoid breaking the flow
+                                        }
+                                    }
+
+                                    // 2. Execute Reader Mode AFTER user scripts. The readability JS should
+                                    //     return an object {title, content} which we render in a clean view.
+                                    if (isReaderMode && readabilityScript.isNotEmpty()) {
+                                        try {
+                                            view?.evaluateJavascript(readabilityScript) { value ->
+                                                if (value != null && value != "null") {
+                                                    val injector = """
+                                                        (function(data) {
+                                                            if (!data) return;
+                                                            try {
+                                                                var title = data.title || document.title || '';
+                                                                var content = data.content || '';
+                                                                var css = 'body{background:#fff;color:#121212;font-family:Roboto,Helvetica,Arial,sans-serif;line-height:1.6;padding:20px;} .strogoff-article{max-width:900px;margin:0 auto;} .strogoff-article h1{font-size:24px;margin-bottom:12px;} img{max-width:100%;height:auto;}';
+                                                                // remove any previous injected style
+                                                                document.head.querySelectorAll('style[data-strogoff]').forEach(function(n){n.remove()});
+                                                                var style = document.createElement('style'); style.setAttribute('data-strogoff', '1'); style.innerHTML = css; document.head.appendChild(style);
+                                                                document.body.innerHTML = '<div class="strogoff-article"><h1>' + title + '</h1>' + content + '</div>';
+                                                                window.scrollTo(0,0);
+                                                            } catch (e) { console.error(e); }
+                                                        })(%s);
+                                                    """.trimIndent()
+
+                                                    // The 'value' is a JSON string; we must pass it safely into the injector.
+                                                    val safeValue = value
+                                                    val final = injector.replace("%s", safeValue)
+                                                    try {
+                                                        view.evaluateJavascript(final, null)
+                                                    } catch (e: Exception) { /* ignore */ }
+                                                }
+                                            }
+                                        } catch (e: Exception) { /* ignore */ }
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
