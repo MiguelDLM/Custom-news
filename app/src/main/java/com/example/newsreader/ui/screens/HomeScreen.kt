@@ -338,14 +338,6 @@ fun HomeScreen(
                         item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                     }
                     items(articles, key = { it.id }) { article ->
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Show a small progress indicator at top when refreshing
-                if (isRefreshing) {
-                    item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-                }
-                    items(articles, key = { it.id }) { article ->
                     val dismissState = rememberDismissState(
                         confirmValueChange = {
                             if (it != DismissValue.Default) {
