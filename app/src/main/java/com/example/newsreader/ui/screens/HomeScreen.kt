@@ -1,6 +1,7 @@
 package com.example.newsreader.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -305,7 +306,27 @@ fun HomeScreen(
         } else {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.padding(padding).fillMaxSize(),
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .pointerInput(listState) {
+                        detectDragGestures { change, dragAmount ->
+                            // dragAmount.y > 0 means user is pulling downwards
+                            if (dragAmount.y > 0f && listState.firstVisibleItemIndex == 0 && !isRefreshing) {
+                                isRefreshing = true
+                                // launch refresh in a coroutine scope from composition
+                                val refreshScope = scope
+                                refreshScope.launch {
+                                    try {
+                                        newsRepository.syncFeeds()
+                                    } catch (e: Exception) {
+                                        // ignore
+                                    }
+                                    isRefreshing = false
+                                }
+                            }
+                        }
+                    },
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {

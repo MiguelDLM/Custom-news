@@ -61,7 +61,8 @@ fun NewsstandScreen(
     
     // Reset pagination when search changes
     LaunchedEffect(searchQuery) {
-        displayedCount = 20
+        // Start showing first page (10 groups) when search changes
+        displayedCount = 10
         listState.scrollToItem(0)
     }
 
@@ -169,21 +170,112 @@ fun NewsstandScreen(
             // Take only a pageful of groups
             val visibleGroups = groups.take(displayedCount)
 
+            // Keep expanded state and per-group pagination
+            val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
+            val displayedPerGroup = remember { mutableStateMapOf<String, Int>() }
+            val loadingPerGroup = remember { mutableStateMapOf<String, Boolean>() }
+
             visibleGroups.forEach { (groupName, groupFeeds) ->
-                item {
-                    // Ensure feeds inside each group are shown alphabetically by title
-                    val sortedFeeds = groupFeeds.sortedBy { it.title }
-                    ExpandableGroup(title = groupName, feeds = sortedFeeds, currentFeeds = feeds, onAdd = { url, title, cats, country ->
-                        scope.launch {
-                            val success = newsRepository.addFeed(url, title, cats, country)
-                            if (success) {
-                                snackbarHostState.showSnackbar("Added $title")
-                            } else {
-                                snackbarHostState.showSnackbar("Feed is broken/invalid. Hiding it.")
-                                newsRepository.markFeedAsBroken(url)
+                // Ensure feeds inside each group are shown alphabetically by title
+                val sortedFeeds = groupFeeds.sortedBy { it.title }
+
+                // Header for group
+                item(key = "group_header_$groupName") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            val currently = expandedGroups[groupName] ?: false
+                            expandedGroups[groupName] = !currently
+                            if (!currently) {
+                                // initialize pagination when expanded
+                                displayedPerGroup[groupName] = 10
+                            }
+                        },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = groupName,
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                if (expandedGroups[groupName] == true) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null
+                            )
+                        }
+                    }
+                }
+
+                // Feed items when expanded
+                if (expandedGroups[groupName] == true) {
+                    val displayed = displayedPerGroup[groupName] ?: 10
+                    val toShow = sortedFeeds.take(displayed)
+
+                    toShow.forEach { feed ->
+                        item(key = "feed_${feed.url}") {
+                            val isSubscribed = feeds.any { it.url == feed.url }
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSubscribed) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+                                ),
+                                border = if (!isSubscribed) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
+                            ) {
+                                ListItem(
+                                    headlineContent = { Text(feed.title) },
+                                    supportingContent = {
+                                        val cats = feed.categories.joinToString(", ") { it.name }
+                                        Text("$cats • ${feed.country}")
+                                    },
+                                    trailingContent = {
+                                        if (!isSubscribed) {
+                                            Button(onClick = {
+                                                scope.launch {
+                                                    val success = newsRepository.addFeed(feed.url, feed.title, feed.categories, feed.country)
+                                                    if (success) {
+                                                        snackbarHostState.showSnackbar("Added ${feed.title}")
+                                                    } else {
+                                                        snackbarHostState.showSnackbar("Feed is broken/invalid. Hiding it.")
+                                                        newsRepository.markFeedAsBroken(feed.url)
+                                                    }
+                                                }
+                                            }) {
+                                                Text(stringResource(R.string.add))
+                                            }
+                                        } else {
+                                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.added), tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                )
                             }
                         }
-                    })
+                    }
+
+                    // Show load more control if there are more feeds
+                    if (displayed < sortedFeeds.size) {
+                        item(key = "load_more_$groupName") {
+                            val loading = loadingPerGroup[groupName] ?: false
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                if (loading) {
+                                    CircularProgressIndicator(Modifier.padding(8.dp))
+                                } else {
+                                    TextButton(onClick = {
+                                        loadingPerGroup[groupName] = true
+                                        scope.launch {
+                                            // simulate async loading to give UI feedback
+                                            kotlinx.coroutines.delay(250)
+                                            displayedPerGroup[groupName] = (displayedPerGroup[groupName] ?: 0) + 10
+                                            loadingPerGroup[groupName] = false
+                                        }
+                                    }) {
+                                        Text("Cargar más")
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             
