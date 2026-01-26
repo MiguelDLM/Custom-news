@@ -42,7 +42,8 @@ fun NewsstandScreen(
 
     // Search & Pagination
     var searchQuery by remember { mutableStateOf("") }
-    var displayedCount by remember { mutableIntStateOf(20) }
+    // Show suggested groups in pages of 10; more are loaded when user scrolls
+    var displayedCount by remember { mutableIntStateOf(10) }
     val listState = rememberLazyListState()
 
     // Filter suggestions
@@ -64,7 +65,7 @@ fun NewsstandScreen(
         listState.scrollToItem(0)
     }
 
-    // Infinite Scroll detection
+    // Infinite Scroll detection for loading more suggestion groups
     val isAtBottom by remember {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
@@ -77,8 +78,8 @@ fun NewsstandScreen(
 
     LaunchedEffect(isAtBottom) {
         if (isAtBottom) {
-            // Grouping makes strict count hard, but we can just bump the limit
-            displayedCount += 20
+            // Load 10 more groups when the user reaches the bottom
+            displayedCount += 10
         }
     }
 
@@ -158,18 +159,21 @@ fun NewsstandScreen(
                 )
             }
 
-            // Group suggestions
+            // Group suggestions and sort groups by key
             val groups = if (groupByCountry) {
                 filteredSuggestions.groupBy { it.country }
             } else {
                 filteredSuggestions.groupBy { it.categories.firstOrNull()?.name ?: "General" }
-            }.toList()
+            }.toList().sortedBy { it.first }
 
+            // Take only a pageful of groups
             val visibleGroups = groups.take(displayedCount)
 
             visibleGroups.forEach { (groupName, groupFeeds) ->
                 item {
-                    ExpandableGroup(title = groupName, feeds = groupFeeds, currentFeeds = feeds, onAdd = { url, title, cats, country ->
+                    // Ensure feeds inside each group are shown alphabetically by title
+                    val sortedFeeds = groupFeeds.sortedBy { it.title }
+                    ExpandableGroup(title = groupName, feeds = sortedFeeds, currentFeeds = feeds, onAdd = { url, title, cats, country ->
                         scope.launch {
                             val success = newsRepository.addFeed(url, title, cats, country)
                             if (success) {
