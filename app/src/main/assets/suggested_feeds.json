@@ -20002,4 +20002,157 @@
     ],
     "country": "INT"
   }
+  ,
+  {
+    "url": "https://www.mdpi.com/journal/fossils/rss",
+    "title": "Fossils (MDPI)",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://www.cambridge.org/core/rss/product/id/10270",
+    "title": "Journal of Paleontology",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "http://www.app.pan.pl/rss.xml",
+    "title": "Acta Palaeontologica Polonica",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "PL"
+  },
+  {
+    "url": "https://sbpbrasil.org/publications/index.php/rbp/gateway/plugin/WebFeedGatewayPlugin/rss",
+    "title": "Revista Brasileira de Paleontologia",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "BR"
+  },
+  {
+    "url": "https://royalsocietypublishing.org/action/showFeed?type=etoc&feed=rss&jc=rsbl",
+    "title": "Biology Letters (Royal Society)",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "GB"
+  },
+  {
+    "url": "https://www.nature.com/palaeo.rss",
+    "title": "Nature – Paleontology",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://zookeys.pensoft.net/rss",
+    "title": "ZooKeys",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://bdj.pensoft.net/rss",
+    "title": "Biodiversity Data Journal",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://journals.biologists.com/jeb/rss",
+    "title": "Journal of Experimental Biology",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "GB"
+  },
+  {
+    "url": "https://academic.oup.com/icb/rss",
+    "title": "Integrative and Comparative Biology",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "US"
+  },
+  {
+    "url": "https://www.mdpi.com/journal/biomechanics/rss",
+    "title": "Biomechanics (MDPI)",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://journals.humankinetics.com/view/journals/jab/jab-overview.xml",
+    "title": "Journal of Applied Biomechanics",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "US"
+  },
+  {
+    "url": "https://www.journals.elsevier.com/journal-of-biomechanics/rss",
+    "title": "Journal of Biomechanics",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://journals.plos.org/plosone/feed/atom",
+    "title": "PLOS ONE",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://pubmed.ncbi.nlm.nih.gov/rss/search/1/?term=paleontology",
+    "title": "PubMed – Paleontology Search",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "US"
+  },
+  {
+    "url": "https://pubmed.ncbi.nlm.nih.gov/rss/search/1/?term=zoology",
+    "title": "PubMed – Zoology Search",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "US"
+  },
+  {
+    "url": "https://pubmed.ncbi.nlm.nih.gov/rss/search/1/?term=biomechanics",
+    "title": "PubMed – Biomechanics Search",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "US"
+  },
+  {
+    "url": "https://api.openalex.org/works?filter=concepts.id:C86803240&format=rss",
+    "title": "OpenAlex – Paleontology",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://api.openalex.org/works?filter=concepts.id:C2778407487&format=rss",
+    "title": "OpenAlex – Biomechanics",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  }
 ]
