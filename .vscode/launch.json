@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to Android process (news)",
+      "type": "android",
+      "request": "attach",
+      "deviceId": "R5CX33LMKED",
+      "package": "com.example.newsreader",
+      "processId": "14977",
+      "appSrcRoot": "${workspaceFolder}/app/src/main"
+    }
+  ]
+}

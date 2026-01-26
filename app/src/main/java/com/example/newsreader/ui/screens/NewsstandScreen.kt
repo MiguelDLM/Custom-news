@@ -267,19 +267,18 @@ fun NewsstandScreen(
                                             Button(onClick = {
                                                 // optimistic UI: mark as pending immediately
                                                 pendingAdded.value = pendingAdded.value + feed.url
-                                                scope.launch {
-                                                    val success = newsRepository.addFeed(feed.url, feed.title, feed.categories, feed.country)
-                                                    if (success) {
-                                                        snackbarHostState.showSnackbar("Added ${feed.title}")
-                                                        // Ask global permission manager to trigger a permission request
-                                                        NotificationPermissionManager.requestPermission()
-                                                    } else {
-                                                        snackbarHostState.showSnackbar("Feed is broken/invalid. Hiding it.")
-                                                        newsRepository.markFeedAsBroken(feed.url)
-                                                    }
-                                                    // remove from pending regardless (DB update will re-render)
-                                                    pendingAdded.value = pendingAdded.value - feed.url
-                                                }
+                                                 scope.launch {
+                                                     val err = newsRepository.addFeed(feed.url, feed.title, feed.categories, feed.country)
+                                                     if (err == null) {
+                                                         snackbarHostState.showSnackbar("Added ${feed.title}")
+                                                         NotificationPermissionManager.requestPermission()
+                                                     } else {
+                                                         snackbarHostState.showSnackbar("Feed invalid: $err")
+                                                         newsRepository.markFeedAsBroken(feed.url)
+                                                     }
+                                                     // remove from pending regardless (DB update will re-render)
+                                                     pendingAdded.value = pendingAdded.value - feed.url
+                                                 }
                                             }) {
                                                 if (isPending) {
                                                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -337,12 +336,12 @@ fun NewsstandScreen(
                 onAdd = { title, url, categoryName ->
                     scope.launch {
                         val cats = listOf(Category.fromString(categoryName))
-                        val success = newsRepository.addFeed(url, title, cats, "Global")
-                        if (success) {
+                        val err = newsRepository.addFeed(url, title, cats, "Global")
+                        if (err == null) {
                              snackbarHostState.showSnackbar("Added $title")
                              showAddDialog = false
                         } else {
-                             snackbarHostState.showSnackbar("Invalid Feed URL")
+                             snackbarHostState.showSnackbar("Invalid Feed: $err")
                         }
                     }
                 }

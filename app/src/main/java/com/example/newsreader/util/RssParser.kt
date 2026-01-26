@@ -13,24 +13,19 @@ import java.util.regex.Pattern
 class RssParser {
 
     suspend fun parse(urlString: String): List<Article> {
-        return try {
-            val url = URL(urlString)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
-            connection.requestMethod = "GET"
-            connection.connect()
+        val url = URL(urlString)
+        val connection = url.openConnection() as HttpURLConnection
+        connection.connectTimeout = 10000
+        connection.readTimeout = 10000
+        connection.requestMethod = "GET"
+        connection.connect()
 
-            if (connection.responseCode == 200) {
-                connection.inputStream.use { inputStream ->
-                    parseFeed(inputStream)
-                }
-            } else {
-                emptyList()
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
+        if (connection.responseCode != 200) {
+            throw IllegalStateException("Unexpected response code: ${connection.responseCode}")
+        }
+
+        connection.inputStream.use { inputStream ->
+            return parseFeed(inputStream)
         }
     }
 
@@ -39,6 +34,8 @@ class RssParser {
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
         parser.setInput(inputStream, null)
 
+        // Ensure this is an RSS/Atom XML by checking the first START_TAG
+        var rootChecked = false
         var eventType = parser.eventType
         val articles = mutableListOf<Article>()
         var currentTitle: String? = null
@@ -47,12 +44,20 @@ class RssParser {
         var currentPubDate: String? = null
         var currentImageUrl: String? = null
         var isInsideItem = false
+        // Treat both RSS (<item>) and Atom (<entry>) as items
 
         while (eventType != XmlPullParser.END_DOCUMENT) {
             val name = parser.name
+            if (!rootChecked && eventType == XmlPullParser.START_TAG) {
+                val root = name?.lowercase()
+                if (root != "rss" && root != "feed" && root != "rdf") {
+                    throw IllegalArgumentException("Not an RSS/Atom feed (root element: $root)")
+                }
+                rootChecked = true
+            }
             when (eventType) {
                 XmlPullParser.START_TAG -> {
-                    if (name.equals("item", ignoreCase = true)) {
+                    if (name.equals("item", ignoreCase = true) || name.equals("entry", ignoreCase = true)) {
                         isInsideItem = true
                         currentTitle = null
                         currentLink = null
@@ -62,15 +67,20 @@ class RssParser {
                     } else if (isInsideItem) {
                         when (name.lowercase()) {
                             "title" -> currentTitle = readText(parser)
-                            "link" -> currentLink = readText(parser)
-                            "description" -> {
+                            // link in RSS is text content, in Atom it's often an element with href attribute
+                            "link" -> {
+                                val href = parser.getAttributeValue(null, "href")
+                                currentLink = href ?: readText(parser)
+                            }
+                            // Atom may use summary or content
+                            "description", "summary", "content" -> {
                                 currentDescription = readText(parser)
-                                // Try to extract image from description if not found yet
                                 if (currentImageUrl == null) {
                                     currentImageUrl = extractImageFromHtml(currentDescription)
                                 }
                             }
-                            "pubdate" -> currentPubDate = readText(parser)
+                            // pubDate in RSS, updated in Atom
+                            "pubdate", "updated" -> currentPubDate = readText(parser)
                             "media:content", "enclosure" -> {
                                 // Try to get url attribute
                                 val url = parser.getAttributeValue(null, "url")
@@ -89,7 +99,7 @@ class RssParser {
                     }
                 }
                 XmlPullParser.END_TAG -> {
-                    if (name.equals("item", ignoreCase = true)) {
+                    if (name.equals("item", ignoreCase = true) || name.equals("entry", ignoreCase = true)) {
                         isInsideItem = false
                         if (currentTitle != null && currentLink != null) {
                             articles.add(

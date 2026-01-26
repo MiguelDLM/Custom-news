@@ -118,19 +118,30 @@ class NewsRepository(
 
     suspend fun getFeedCount(): Int = feedDao.getFeedCount()
 
-    suspend fun addFeed(url: String, title: String, categories: List<com.example.newsreader.data.local.entity.Category>, country: String = "Global"): Boolean {
-        // Validate feed
+    // Returns null on success, or an error message describing the failure
+    suspend fun addFeed(url: String, title: String, categories: List<com.example.newsreader.data.local.entity.Category>, country: String = "Global"): String? {
+        // Validate feed: ensure it's reachable and a valid RSS/Atom feed and has at least one item
         return try {
-            withContext(Dispatchers.IO) {
+            val parsed = withContext(Dispatchers.IO) {
                 rssParser.parse(url)
             }
-            // If parse succeeds, insert
-            feedDao.insertFeed(FeedEntity(url = url, title = title, categories = categories, country = country))
-            syncFeeds()
-            true
+            if (parsed.isEmpty()) {
+                // Consider empty feeds invalid for adding
+                "Feed parsed but contains no items"
+            } else {
+                // If parse succeeds and has items, insert
+                feedDao.insertFeed(FeedEntity(url = url, title = title, categories = categories, country = country))
+                syncFeeds()
+                null
+            }
         } catch (e: Exception) {
             e.printStackTrace()
-            false
+            // Mark as broken for future filtering
+            try {
+                markFeedAsBroken(url)
+            } catch (_: Exception) {}
+            // Return a concise error message
+            e.message ?: "Unknown error"
         }
     }
 
