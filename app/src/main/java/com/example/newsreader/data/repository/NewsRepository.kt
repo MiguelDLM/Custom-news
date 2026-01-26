@@ -183,12 +183,12 @@ class NewsRepository(
                     
                     if (newEntities.isNotEmpty()) {
                         articleDao.insertArticles(newEntities)
-                        
+
                         // Check for notifications
                         if (whitelist.isNotEmpty()) {
                             newEntities.forEach { article ->
                                 if (whitelist.any { article.title.contains(it, ignoreCase = true) }) {
-                                    sendNotification(article.title)
+                                    notificationHelper.sendNotification(article.title)
                                 }
                             }
                         }
@@ -200,44 +200,7 @@ class NewsRepository(
         }
     }
     
-    @SuppressLint("MissingPermission")
-    private fun sendNotification(title: String) {
-        val channelId = "news_channel"
-        val notificationId = title.hashCode()
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "News Updates"
-            val descriptionText = "Notifications for interested topics"
-            val importance = NotificationManager.IMPORTANCE_DEFAULT
-            val channel = NotificationChannel(channelId, name, importance).apply {
-                description = descriptionText
-            }
-            val notificationManager: NotificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-        }
-
-        try {
-            val builder = NotificationCompat.Builder(context, channelId)
-                .setSmallIcon(android.R.drawable.ic_dialog_info) 
-                .setContentTitle(context.getString(R.string.app_name))
-                .setContentText(title)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setAutoCancel(true)
-
-            with(NotificationManagerCompat.from(context)) {
-                // permission check needed for API 33+
-                // ignoring for prototype simplicity as requested to "just work" in context or user will handle permissions
-                try {
-                    notify(notificationId, builder.build())
-                } catch (e: SecurityException) {
-                    // Permission not granted
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
+    private val notificationHelper = NotificationHelper(context)
 
     suspend fun hideArticle(articleId: Long) {
         articleDao.hideArticle(articleId)

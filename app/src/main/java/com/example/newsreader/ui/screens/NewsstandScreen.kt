@@ -48,10 +48,13 @@ fun NewsstandScreen(
 
     // Filter suggestions
     val suggestions = newsRepository.suggestedFeeds
-    val filteredSuggestions by remember(searchQuery, brokenFeeds, suggestions) {
+    // Exclude broken and already-subscribed feeds from the available suggestions
+    val filteredSuggestions by remember(searchQuery, brokenFeeds, suggestions, feeds) {
         derivedStateOf {
+            val subscribedUrls = feeds.map { it.url }.toSet()
             suggestions.filter { feed ->
                 !brokenFeeds.contains(feed.url) &&
+                !subscribedUrls.contains(feed.url) &&
                 (searchQuery.isBlank() || 
                  feed.title.contains(searchQuery, ignoreCase = true) || 
                  feed.url.contains(searchQuery, ignoreCase = true))
