@@ -5,13 +5,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -28,22 +32,82 @@ fun NewsstandScreen(
     newsRepository: NewsRepository
 ) {
     val feeds by newsRepository.allFeeds.collectAsState(initial = emptyList())
+    val brokenFeeds by newsRepository.brokenFeeds.collectAsState(initial = emptySet())
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
     
     // Grouping Mode
     var groupByCountry by remember { mutableStateOf(true) } // true = Country, false = Category
 
+    // Search & Pagination
+    var searchQuery by remember { mutableStateOf("") }
+    var displayedCount by remember { mutableIntStateOf(20) }
+    val listState = rememberLazyListState()
+
+    // Filter suggestions
+    val suggestions = newsRepository.suggestedFeeds
+    val filteredSuggestions by remember(searchQuery, brokenFeeds, suggestions) {
+        derivedStateOf {
+            suggestions.filter { feed ->
+                !brokenFeeds.contains(feed.url) &&
+                (searchQuery.isBlank() || 
+                 feed.title.contains(searchQuery, ignoreCase = true) || 
+                 feed.url.contains(searchQuery, ignoreCase = true))
+            }
+        }
+    }
+    
+    // Reset pagination when search changes
+    LaunchedEffect(searchQuery) {
+        displayedCount = 20
+        listState.scrollToItem(0)
+    }
+
+    // Infinite Scroll detection
+    val isAtBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            val visibleItems = layoutInfo.visibleItemsInfo
+            if (visibleItems.isEmpty()) false
+            else visibleItems.last().index >= totalItems - 5 
+        }
+    }
+
+    LaunchedEffect(isAtBottom) {
+        if (isAtBottom) {
+            // Grouping makes strict count hard, but we can just bump the limit
+            displayedCount += 20
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.newsstand)) },
-                actions = {
-                    TextButton(onClick = { groupByCountry = !groupByCountry }) {
-                        Text(if (groupByCountry) "Group by Category" else "Group by Country")
+            Column {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.newsstand)) },
+                    actions = {
+                        TextButton(onClick = { groupByCountry = !groupByCountry }) {
+                            Text(if (groupByCountry) "Group by Category" else "Group by Country")
+                        }
                     }
-                }
-            )
+                )
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = { Text("Search feeds...") },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = if (searchQuery.isNotEmpty()) {
+                        { IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, null) } }
+                    } else null
+                )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
@@ -52,6 +116,7 @@ fun NewsstandScreen(
         }
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -94,20 +159,36 @@ fun NewsstandScreen(
             }
 
             // Group suggestions
-            val suggestions = newsRepository.suggestedFeeds
             val groups = if (groupByCountry) {
-                suggestions.groupBy { it.country }
+                filteredSuggestions.groupBy { it.country }
             } else {
-                // Group by the first category for simplicity in this view
-                suggestions.groupBy { it.categories.firstOrNull()?.name ?: "General" }
-            }
+                filteredSuggestions.groupBy { it.categories.firstOrNull()?.name ?: "General" }
+            }.toList()
 
-            groups.forEach { (groupName, groupFeeds) ->
+            val visibleGroups = groups.take(displayedCount)
+
+            visibleGroups.forEach { (groupName, groupFeeds) ->
                 item {
                     ExpandableGroup(title = groupName, feeds = groupFeeds, currentFeeds = feeds, onAdd = { url, title, cats, country ->
-                        scope.launch { newsRepository.addFeed(url, title, cats, country) }
+                        scope.launch {
+                            val success = newsRepository.addFeed(url, title, cats, country)
+                            if (success) {
+                                snackbarHostState.showSnackbar("Added $title")
+                            } else {
+                                snackbarHostState.showSnackbar("Feed is broken/invalid. Hiding it.")
+                                newsRepository.markFeedAsBroken(url)
+                            }
+                        }
                     })
                 }
+            }
+            
+            if (visibleGroups.size < groups.size) {
+                 item {
+                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                         CircularProgressIndicator()
+                     }
+                 }
             }
         }
 
@@ -116,10 +197,14 @@ fun NewsstandScreen(
                 onDismiss = { showAddDialog = false },
                 onAdd = { title, url, categoryName ->
                     scope.launch {
-                        // For custom feeds, we just assume General category and Global country for now, or we could add more inputs
                         val cats = listOf(Category.fromString(categoryName))
-                        newsRepository.addFeed(url, title, cats, "Global")
-                        showAddDialog = false
+                        val success = newsRepository.addFeed(url, title, cats, "Global")
+                        if (success) {
+                             snackbarHostState.showSnackbar("Added $title")
+                             showAddDialog = false
+                        } else {
+                             snackbarHostState.showSnackbar("Invalid Feed URL")
+                        }
                     }
                 }
             )

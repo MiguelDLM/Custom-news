@@ -27,6 +27,11 @@ class SettingsRepository(private val context: Context) {
         // AdBlocker
         val ADBLOCK_ENABLED_LISTS_KEY = stringSetPreferencesKey("adblock_enabled_lists")
         val ADBLOCK_CUSTOM_LISTS_KEY = stringSetPreferencesKey("adblock_custom_lists")
+        val BROKEN_FEEDS_KEY = stringSetPreferencesKey("broken_feeds")
+    }
+
+    val brokenFeeds: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[BROKEN_FEEDS_KEY] ?: emptySet()
     }
 
     val lastSync: Flow<Long> = context.dataStore.data.map { preferences ->
@@ -135,6 +140,13 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAdBlockCustomLists(lists: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[ADBLOCK_CUSTOM_LISTS_KEY] = lists
+        }
+    }
+
+    suspend fun addBrokenFeed(url: String) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[BROKEN_FEEDS_KEY] ?: emptySet()
+            preferences[BROKEN_FEEDS_KEY] = current + url
         }
     }
 }

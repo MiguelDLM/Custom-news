@@ -49,7 +49,8 @@ class NewsRepository(
     val tabOrder: Flow<List<String>> = settingsRepository.tabOrder
     
     val allFeeds: Flow<List<FeedEntity>> = feedDao.getAllFeeds()
-    val searchHistory: Flow<List<SearchHistoryEntity>> = searchHistoryDao.getRecentSearches() // Add this
+    val searchHistory: Flow<List<SearchHistoryEntity>> = searchHistoryDao.getRecentSearches()
+    val brokenFeeds: Flow<Set<String>> = settingsRepository.brokenFeeds
 
     suspend fun saveSearch(query: String) {
         searchHistoryDao.insertSearch(SearchHistoryEntity(query = query))
@@ -117,9 +118,24 @@ class NewsRepository(
 
     suspend fun getFeedCount(): Int = feedDao.getFeedCount()
 
-    suspend fun addFeed(url: String, title: String, categories: List<com.example.newsreader.data.local.entity.Category>, country: String = "Global") {
-        feedDao.insertFeed(FeedEntity(url = url, title = title, categories = categories, country = country))
-        syncFeeds()
+    suspend fun addFeed(url: String, title: String, categories: List<com.example.newsreader.data.local.entity.Category>, country: String = "Global"): Boolean {
+        // Validate feed
+        return try {
+            withContext(Dispatchers.IO) {
+                rssParser.parse(url)
+            }
+            // If parse succeeds, insert
+            feedDao.insertFeed(FeedEntity(url = url, title = title, categories = categories, country = country))
+            syncFeeds()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun markFeedAsBroken(url: String) {
+        settingsRepository.addBrokenFeed(url)
     }
 
     suspend fun deleteFeed(feed: FeedEntity) {

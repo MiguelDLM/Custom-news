@@ -36,3 +36,6 @@ keystore.properties
 
 # Misc
 *.hprof
+keystore_base64_oneline.txt
+extract_to_json.py
+rewrite_repo.py
