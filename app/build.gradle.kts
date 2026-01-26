@@ -52,6 +52,8 @@ android {
 
     buildTypes {
         release {
+            // Require a release signing config — builds must provide a keystore (keystore.properties
+            // or ANDROID_KEYSTORE_FILE + env vars). Failing early prevents unsigned release artifacts.
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
