@@ -383,6 +383,9 @@ fun HomeScreen(
     }
 }
 
+// Balance braces: HomeScreen composable finishes above — ensure file has proper closure
+}
+
 fun sortArticles(list: List<ArticleEntity>, byDate: Boolean): List<ArticleEntity> {
     return if (byDate) {
         list.sortedByDescending { it.pubDateMillis }
