@@ -12,7 +12,7 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE isHidden = 0 ORDER BY pubDateMillis DESC")
     fun getAllArticles(): Flow<List<ArticleEntity>>
 
-    @Query("SELECT * FROM articles WHERE category = :category AND isHidden = 0 ORDER BY pubDateMillis DESC")
+    @Query("SELECT * FROM articles WHERE category = :category COLLATE NOCASE AND isHidden = 0 ORDER BY pubDateMillis DESC")
     fun getArticlesByCategory(category: String): Flow<List<ArticleEntity>>
 
     // Use COLLATE NOCASE to make searches case-insensitive and more reliable across locales

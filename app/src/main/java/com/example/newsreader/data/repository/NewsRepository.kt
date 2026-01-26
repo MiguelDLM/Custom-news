@@ -15,6 +15,8 @@ import com.example.newsreader.data.local.entity.FeedEntity
 import com.example.newsreader.util.DateUtils
 import com.example.newsreader.util.RssParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -94,12 +96,7 @@ class NewsRepository(
         val flow = if (category == "All") {
             articleDao.getAllArticles()
         } else {
-            // Fix case sensitivity by fetching all and filtering in memory if needed, 
-            // or rely on DAO. DAO 'WHERE category = :category' is usually case-sensitive in SQLite unless COLLATE NOCASE.
-            // Let's try to match loosely or trust the data input.
-            // Since user reported issues, let's fetch all and filter in Kotlin to be safe for now, 
-            // OR ensure input category matches DB.
-            articleDao.getArticlesByCategory(category) 
+            articleDao.getArticlesByCategory(category)
         }
         
         return combine(flow, settingsRepository.keywordBlacklist) { articles, blacklist ->
@@ -176,38 +173,41 @@ class NewsRepository(
             val whitelist = settingsRepository.keywordWhitelist.first()
             val existingArticles = articleDao.getAllArticles().first().map { it.link }.toSet()
 
-            feeds.forEach { feed ->
-                try {
-                    val parsedArticles = rssParser.parse(feed.url)
-                    val newEntities = parsedArticles.filter { !existingArticles.contains(it.link) }.map { article ->
-                        ArticleEntity(
-                            feedId = feed.id,
-                            title = article.title,
-                            link = article.link,
-                            description = article.description,
-                            imageUrl = article.imageUrl,
-                            pubDate = article.pubDate,
-                            pubDateMillis = DateUtils.parseDate(article.pubDate),
-                            category = feed.categories.firstOrNull()?.name ?: "General"
-                        )
-                    }
-                    
-                    if (newEntities.isNotEmpty()) {
-                        articleDao.insertArticles(newEntities)
+            val jobs = feeds.map { feed ->
+                async {
+                    try {
+                        val parsedArticles = rssParser.parse(feed.url)
+                        val newEntities = parsedArticles.filter { !existingArticles.contains(it.link) }.map { article ->
+                            ArticleEntity(
+                                feedId = feed.id,
+                                title = article.title,
+                                link = article.link,
+                                description = article.description,
+                                imageUrl = article.imageUrl,
+                                pubDate = article.pubDate,
+                                pubDateMillis = DateUtils.parseDate(article.pubDate),
+                                category = feed.categories.firstOrNull()?.name ?: "General"
+                            )
+                        }
+                        
+                        if (newEntities.isNotEmpty()) {
+                            articleDao.insertArticles(newEntities)
 
-                        // Check for notifications
-                        if (whitelist.isNotEmpty()) {
-                            newEntities.forEach { article ->
-                                if (whitelist.any { article.title.contains(it, ignoreCase = true) }) {
-                                    notificationHelper.sendNotification(article.title)
+                            // Check for notifications
+                            if (whitelist.isNotEmpty()) {
+                                newEntities.forEach { article ->
+                                    if (whitelist.any { article.title.contains(it, ignoreCase = true) }) {
+                                        notificationHelper.sendNotification(article.title)
+                                    }
                                 }
                             }
                         }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
             }
+            jobs.awaitAll()
         }
     }
     
