@@ -12,7 +12,7 @@
     <string name="load_more">Cargar más</string>
     <string name="no_topics">No se han encontrado temas de interés.</string>
     <string name="add_interests">Añadir intereses</string>
-    <string name="no_results">Sin resultados para '%1$s'</string>
+    <string name="no_results">Sin resultados para %1$s</string>
     <string name="add">Añadir</string>
     <string name="added">Añadido</string>
     <string name="unsubscribe">Desuscribirse</string>
