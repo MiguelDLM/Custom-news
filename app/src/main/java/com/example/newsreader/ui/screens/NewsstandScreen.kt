@@ -22,6 +22,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.example.newsreader.data.repository.NotificationHelper
+import com.example.newsreader.data.repository.NotificationPermissionManager
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -64,6 +66,15 @@ fun NewsstandScreen(
     val hasNotificationPermission = remember { mutableStateOf(notificationHelper.hasPermission()) }
     val permissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { granted: Boolean ->
         hasNotificationPermission.value = granted
+    }
+
+    // Listen to global permission requests (so permission can be requested from other places)
+    LaunchedEffect(Unit) {
+        NotificationPermissionManager.requests.collectLatest {
+            if (!hasNotificationPermission.value) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
     }
     // Exclude broken and already-subscribed feeds from the available suggestions
     val filteredSuggestions by remember(searchQuery, brokenFeeds, suggestions, feeds, pendingAdded) {
@@ -260,11 +271,8 @@ fun NewsstandScreen(
                                                     val success = newsRepository.addFeed(feed.url, feed.title, feed.categories, feed.country)
                                                     if (success) {
                                                         snackbarHostState.showSnackbar("Added ${feed.title}")
-                                                        // Request notification permission if needed so future notifications work
-                                                        if (!hasNotificationPermission.value) {
-                                                            // launcher will update state
-                                                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                                                        }
+                                                        // Ask global permission manager to trigger a permission request
+                                                        NotificationPermissionManager.requestPermission()
                                                     } else {
                                                         snackbarHostState.showSnackbar("Feed is broken/invalid. Hiding it.")
                                                         newsRepository.markFeedAsBroken(feed.url)
