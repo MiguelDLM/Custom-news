@@ -1,0 +1,29 @@
+{
+  "updated": [
+    {
+      "original": "https://www.mdpi.com/journal/fossils/rss",
+      "new": "https://www.mdpi.com/rss",
+      "reason": "discovered from html link"
+    },
+    {
+      "original": "https://www.mdpi.com/journal/biomechanics/rss",
+      "new": "https://www.mdpi.com/rss",
+      "reason": "discovered from html link"
+    }
+  ],
+  "removed": [
+    "https://www.cambridge.org/core/rss/product/id/10270",
+    "http://www.app.pan.pl/rss.xml",
+    "https://royalsocietypublishing.org/action/showFeed?type=etoc&feed=rss&jc=rsbl",
+    "https://www.nature.com/palaeo.rss",
+    "https://journals.biologists.com/jeb/rss",
+    "https://academic.oup.com/icb/rss",
+    "https://journals.humankinetics.com/view/journals/jab/jab-overview.xml",
+    "https://www.journals.elsevier.com/journal-of-biomechanics/rss",
+    "https://pubmed.ncbi.nlm.nih.gov/rss/search/1/?term=paleontology",
+    "https://pubmed.ncbi.nlm.nih.gov/rss/search/1/?term=zoology",
+    "https://pubmed.ncbi.nlm.nih.gov/rss/search/1/?term=biomechanics",
+    "https://api.openalex.org/works?filter=concepts.id:C86803240&format=rss",
+    "https://api.openalex.org/works?filter=concepts.id:C2778407487&format=rss"
+  ]
+}
