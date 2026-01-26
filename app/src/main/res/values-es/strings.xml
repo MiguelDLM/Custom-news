@@ -7,6 +7,12 @@
     <string name="no_subscriptions">Sin suscripciones. ¡Añade algunas abajo!</string>
     <string name="your_subscriptions">Tus Suscripciones</string>
     <string name="suggested_sources">Fuentes Sugeridas</string>
+    <string name="search_feeds">Buscar feeds...</string>
+    <string name="clear_all">Borrar todo</string>
+    <string name="load_more">Cargar más</string>
+    <string name="no_topics">No se han encontrado temas de interés.</string>
+    <string name="add_interests">Añadir intereses</string>
+    <string name="no_results">Sin resultados para '%1$s'</string>
     <string name="add">Añadir</string>
     <string name="added">Añadido</string>
     <string name="unsubscribe">Desuscribirse</string>
@@ -44,4 +50,5 @@
     <string name="reading">Leyendo</string>
     <string name="script_suggestion_banner">Scripts disponibles (%1$d)</string>
     <string name="inject_script">Inyectar Script</string>
+    <string name="recent_searches">Búsquedas recientes</string>
 </resources>

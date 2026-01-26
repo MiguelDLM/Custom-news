@@ -21,6 +21,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -168,7 +171,7 @@ fun HomeScreen(
                         }
                     } 
                 ) {
-                   if (searchQuery.isEmpty()) {
+                 if (searchQuery.isEmpty()) {
                        LazyColumn {
                            item {
                                Row(
@@ -176,13 +179,13 @@ fun HomeScreen(
                                    horizontalArrangement = Arrangement.SpaceBetween,
                                    verticalAlignment = Alignment.CenterVertically
                                ) {
-                                   Text("Recent Searches", style = MaterialTheme.typography.titleMedium)
-                                   if (searchHistory.isNotEmpty()) {
-                                       TextButton(onClick = { scope.launch { newsRepository.clearHistory() } }) {
-                                           Text("Clear All")
-                                       }
-                                   }
-                               }
+                                    Text(stringResource(R.string.recent_searches), style = MaterialTheme.typography.titleMedium)
+                                    if (searchHistory.isNotEmpty()) {
+                                        TextButton(onClick = { scope.launch { newsRepository.clearHistory() } }) {
+                                            Text(stringResource(R.string.clear_all))
+                                        }
+                                    }
+                                }
                            }
                            items(searchHistory) { historyItem ->
                                ListItem(
@@ -288,11 +291,11 @@ fun HomeScreen(
         } else if (currentCategoryKey == "For You" && articles.isEmpty() && searchQuery.isEmpty()) {
              Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                  Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                     Text("No topics of interest found.")
+                      Text(stringResource(R.string.no_topics))
                      Spacer(modifier = Modifier.height(8.dp))
-                     Button(onClick = onSettingsClick) {
-                         Text("Add Interests")
-                     }
+                      Button(onClick = onSettingsClick) {
+                          Text(stringResource(R.string.add_interests))
+                      }
                  }
              }
         } else if (articles.isEmpty()) {
@@ -304,29 +307,37 @@ fun HomeScreen(
                 }
             }
         } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .pointerInput(listState) {
-                        detectDragGestures { change, dragAmount ->
-                            // dragAmount.y > 0 means user is pulling downwards
-                            if (dragAmount.y > 0f && listState.firstVisibleItemIndex == 0 && !isRefreshing) {
-                                isRefreshing = true
-                                // launch refresh in a coroutine scope from composition
-                                val refreshScope = scope
-                                refreshScope.launch {
-                                    try {
-                                        newsRepository.syncFeeds()
-                                    } catch (e: Exception) {
-                                        // ignore
-                                    }
-                                    isRefreshing = false
-                                }
-                            }
+            // Use Compose pull-to-refresh from material
+            val pullRefreshState = rememberPullRefreshState(isRefreshing, onRefresh = {
+                if (!isRefreshing) {
+                    isRefreshing = true
+                    scope.launch {
+                        try {
+                            newsRepository.syncFeeds()
+                        } catch (e: Exception) {
+                            // ignore
                         }
-                    },
+                        isRefreshing = false
+                    }
+                }
+            })
+
+            Box(modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .pullRefresh(pullRefreshState)) {
+
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Show a small progress indicator at top when refreshing (kept for accessibility fallback)
+                    if (isRefreshing) {
+                        item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                    }
+                    items(articles, key = { it.id }) { article ->
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -334,7 +345,7 @@ fun HomeScreen(
                 if (isRefreshing) {
                     item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                 }
-                items(articles, key = { it.id }) { article ->
+                    items(articles, key = { it.id }) { article ->
                     val dismissState = rememberDismissState(
                         confirmValueChange = {
                             if (it != DismissValue.Default) {
@@ -368,6 +379,13 @@ fun HomeScreen(
                         directions = setOf(DismissDirection.EndToStart)
                     )
                 }
+
+                // Pull refresh indicator overlay
+                PullRefreshIndicator(
+                    refreshing = isRefreshing,
+                    state = pullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
             }
         }
     }

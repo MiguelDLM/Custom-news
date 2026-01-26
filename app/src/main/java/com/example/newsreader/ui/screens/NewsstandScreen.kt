@@ -270,7 +270,7 @@ fun NewsstandScreen(
                                             loadingPerGroup[groupName] = false
                                         }
                                     }) {
-                                        Text("Cargar más")
+                                    Text(stringResource(R.string.load_more))
                                     }
                                 }
                             }
