@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -43,7 +44,7 @@ import java.net.URI
 
 import com.example.newsreader.data.local.entity.Category
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun HomeScreen(
     newsRepository: NewsRepository,
@@ -371,6 +372,7 @@ fun HomeScreen(
                         directions = setOf(DismissDirection.EndToStart)
                     )
                 }
+                }
 
                 // Pull refresh indicator overlay
                 PullRefreshIndicator(
@@ -384,7 +386,6 @@ fun HomeScreen(
 }
 
 // Balance braces: HomeScreen composable finishes above — ensure file has proper closure
-}
 
 fun sortArticles(list: List<ArticleEntity>, byDate: Boolean): List<ArticleEntity> {
     return if (byDate) {

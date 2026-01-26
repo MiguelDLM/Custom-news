@@ -117,6 +117,21 @@ fun NewsstandScreen(
             }
         }
     ) { padding ->
+        // Group suggestions and sort groups by key
+        val groups = if (groupByCountry) {
+            filteredSuggestions.groupBy { it.country }
+        } else {
+            filteredSuggestions.groupBy { it.categories.firstOrNull()?.name ?: "General" }
+        }.toList().sortedBy { it.first }
+
+        // Take only a pageful of groups
+        val visibleGroups = groups.take(displayedCount)
+
+        // Keep expanded state and per-group pagination
+        val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
+        val displayedPerGroup = remember { mutableStateMapOf<String, Int>() }
+        val loadingPerGroup = remember { mutableStateMapOf<String, Boolean>() }
+
         LazyColumn(
             state = listState,
             modifier = Modifier.padding(padding).fillMaxSize(),
@@ -159,21 +174,6 @@ fun NewsstandScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-
-            // Group suggestions and sort groups by key
-            val groups = if (groupByCountry) {
-                filteredSuggestions.groupBy { it.country }
-            } else {
-                filteredSuggestions.groupBy { it.categories.firstOrNull()?.name ?: "General" }
-            }.toList().sortedBy { it.first }
-
-            // Take only a pageful of groups
-            val visibleGroups = groups.take(displayedCount)
-
-            // Keep expanded state and per-group pagination
-            val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
-            val displayedPerGroup = remember { mutableStateMapOf<String, Int>() }
-            val loadingPerGroup = remember { mutableStateMapOf<String, Boolean>() }
 
             visibleGroups.forEach { (groupName, groupFeeds) ->
                 // Ensure feeds inside each group are shown alphabetically by title
