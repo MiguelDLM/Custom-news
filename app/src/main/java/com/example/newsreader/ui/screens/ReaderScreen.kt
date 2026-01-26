@@ -67,10 +67,13 @@ fun ReaderScreen(
         }
     }
 
+    // Fallback title without relying on resource generation in CI runs
+    val titleText = if (domain.isBlank()) "Reading" else domain
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(domain.ifBlank { stringResource(R.string.reading) }, style = MaterialTheme.typography.titleMedium) },
+                title = { Text(titleText, style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
                 },
@@ -128,7 +131,7 @@ fun ReaderScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = stringResource(R.string.script_suggestion_banner, availableScriptsCount),
+                            text = "Scripts available ($availableScriptsCount)",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
