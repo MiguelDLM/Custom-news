@@ -34,13 +34,28 @@ jobs:
       run: |
         echo "$ANDROID_KEYSTORE_BASE64" | base64 -d -i > ${{ github.workspace }}/upload-keystore.jks
 
-    - name: Build with Gradle
+    - name: Build with Gradle (capture logs)
       env:
         ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/upload-keystore.jks
         ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
         ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      run: ./gradlew assembleRelease
+      run: |
+        set -o pipefail
+        ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee build_output.log
+        echo "Gradle exit: ${PIPESTATUS[0]}"
+        # Fail if gradle returned non-zero (preserve original behavior)
+        if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+          echo "Gradle build failed, see build_output.log"
+          exit 1
+        fi
+
+    - name: Upload Gradle log (for diagnostics)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: gradle-build-log
+        path: build_output.log
 
     # Debug step: print commit and key files to help diagnose mismatches between workspace and expected sources
     - name: CI debug info
