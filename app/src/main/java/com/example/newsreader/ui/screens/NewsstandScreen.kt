@@ -15,6 +15,13 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import com.example.newsreader.data.repository.NotificationHelper
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -47,14 +54,25 @@ fun NewsstandScreen(
     val listState = rememberLazyListState()
 
     // Filter suggestions
+    val context = LocalContext.current
+    val notificationHelper = NotificationHelper(context)
     val suggestions = newsRepository.suggestedFeeds
+    // Pending additions while waiting for validation/DB insert
+    val pendingAdded by remember { mutableStateOf(mutableStateOf(setOf<String>())) }
+
+    // Permission handling for notifications (Android 13+)
+    val hasNotificationPermission = remember { mutableStateOf(notificationHelper.hasPermission()) }
+    val permissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { granted: Boolean ->
+        hasNotificationPermission.value = granted
+    }
     // Exclude broken and already-subscribed feeds from the available suggestions
-    val filteredSuggestions by remember(searchQuery, brokenFeeds, suggestions, feeds) {
+    val filteredSuggestions by remember(searchQuery, brokenFeeds, suggestions, feeds, pendingAdded) {
         derivedStateOf {
             val subscribedUrls = feeds.map { it.url }.toSet()
             suggestions.filter { feed ->
                 !brokenFeeds.contains(feed.url) &&
                 !subscribedUrls.contains(feed.url) &&
+                !pendingAdded.value.contains(feed.url) &&
                 (searchQuery.isBlank() || 
                  feed.title.contains(searchQuery, ignoreCase = true) || 
                  feed.url.contains(searchQuery, ignoreCase = true))
@@ -234,18 +252,32 @@ fun NewsstandScreen(
                                     },
                                     trailingContent = {
                                         if (!isSubscribed) {
+                                            val isPending = pendingAdded.value.contains(feed.url)
                                             Button(onClick = {
+                                                // optimistic UI: mark as pending immediately
+                                                pendingAdded.value = pendingAdded.value + feed.url
                                                 scope.launch {
                                                     val success = newsRepository.addFeed(feed.url, feed.title, feed.categories, feed.country)
                                                     if (success) {
                                                         snackbarHostState.showSnackbar("Added ${feed.title}")
+                                                        // Request notification permission if needed so future notifications work
+                                                        if (!hasNotificationPermission.value) {
+                                                            // launcher will update state
+                                                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                                        }
                                                     } else {
                                                         snackbarHostState.showSnackbar("Feed is broken/invalid. Hiding it.")
                                                         newsRepository.markFeedAsBroken(feed.url)
                                                     }
+                                                    // remove from pending regardless (DB update will re-render)
+                                                    pendingAdded.value = pendingAdded.value - feed.url
                                                 }
                                             }) {
-                                                Text(stringResource(R.string.add))
+                                                if (isPending) {
+                                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                                } else {
+                                                    Text(stringResource(R.string.add))
+                                                }
                                             }
                                         } else {
                                             Icon(Icons.Default.Add, contentDescription = stringResource(R.string.added), tint = MaterialTheme.colorScheme.primary)
