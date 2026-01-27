@@ -11,12 +11,12 @@ android {
     namespace = "com.example.newsreader"
     compileSdk = 34
 
-    defaultConfig {
+        defaultConfig {
         applicationId = "com.example.newsreader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.6"
+        versionCode = 4
+        versionName = "1.0.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
