@@ -2291,8 +2291,8 @@
     "country": "INT"
   },
   {
-    "url": "https://rss.sciencedirect.com/publication/science/24521094",
-    "title": "Advances in Radiation Oncology",
+    "url": "https://rss.sciencedirect.com/publication/science/09680896",
+    "title": "Bioorganic & Medicinal Chemistry",
     "categories": [
       "SCIENCE"
     ],
@@ -19463,6 +19463,11 @@
     "title": "Trends in Parasitology",
     "categories": [
       "SCIENCE"
+    "url": "https://rss.sciencedirect.com/publication/science/09680896",
+    "title": "Bioorganic & Medicinal Chemistry",
+    "categories": [
+      "SCIENCE"
+    ],
     ],
     "country": "INT"
   },
@@ -20033,5 +20038,105 @@
       "SCIENCE"
     ],
     "country": "BR"
+  },
+  {
+    "url": "https://rss.sciencedirect.com/publication/science/09601481",
+    "title": "Zeitschrift f\u00fcr Psychologie",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://rss.sciencedirect.com/publication/science/00416295",
+    "title": "Zeitschrift f\u00fcr Naturforschung C",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://rss.sciencedirect.com/publication/science/00426966",
+    "title": "Zeitschrift f\u00fcr Kristallographie - Crystalline Materials",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://rss.sciencedirect.com/publication/science/00401625",
+    "title": "Zeitschrift f\u00fcr Metallkunde",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://palaeo-electronica.org/content/component/joomrss/palaeo-electronica",
+    "title": "Palaeontologia Electronica",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://www.nature.com/subjects/palaeontology.rss",
+    "title": "Palaeontology - Nature",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  }
+  ,
+  {
+    "url": "https://www.sciencenews.org/topic/paleontology/feed",
+    "title": "ScienceNews - Paleontology",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "US"
+  }
+
+  ,
+  {
+    "url": "https://alfmuseum.org/feed/",
+    "title": "Raymond M. Alf Museum of Paleontology",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "US"
+  },
+  {
+    "url": "https://flinderspalaeosoc.org/blog-feed.xml",
+    "title": "Flinders University – Palaeontology Society (FUPS)",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "AU"
+  }
+  ,
+  {
+    "url": "https://www.cambridge.org/core/rss/product/id/EAEE1F405BB3C7A62CA80D264D6EDE2C",
+    "title": "The Paleontological Society Papers",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://onlinelibrary.wiley.com/feed/14754983/most-recent",
+    "title": "Palaeontology (Wiley)",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
+  },
+  {
+    "url": "https://royalsocietypublishing.org/rss/site_1000027/1000016.xml",
+    "title": "Royal Society Publishing - Palaeontology",
+    "categories": [
+      "SCIENCE"
+    ],
+    "country": "INT"
   }
 ]

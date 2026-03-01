@@ -8,15 +8,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.newsreader"
+    namespace = "com.museovirtualnacional.strogoff"
     compileSdk = 34
 
         defaultConfig {
-        applicationId = "com.example.newsreader"
+        applicationId = "com.museovirtualnacional.strogoff"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.0.8"
+        versionCode = 6
+        versionName = "1.0.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

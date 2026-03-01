@@ -1,0 +1,24 @@
+package com.museovirtualnacional.strogoff.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.museovirtualnacional.strogoff.data.local.entity.FeedEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface FeedDao {
+    @Query("SELECT * FROM feeds")
+    fun getAllFeeds(): Flow<List<FeedEntity>>
+
+    @Query("SELECT COUNT(*) FROM feeds")
+    suspend fun getFeedCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFeed(feed: FeedEntity)
+
+    @Delete
+    suspend fun deleteFeed(feed: FeedEntity)
+}
