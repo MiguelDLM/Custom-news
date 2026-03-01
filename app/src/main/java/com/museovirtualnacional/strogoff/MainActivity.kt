@@ -32,7 +32,7 @@ import java.util.Locale
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 class MainActivity : ComponentActivity() {
-    private val _intentFlow = MutableSharedFlow<Intent>(extraBufferCapacity = 1)
+    private val _intentFlow = MutableSharedFlow<Intent>(replay = 1, extraBufferCapacity = 1)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -72,6 +72,8 @@ class MainActivity : ComponentActivity() {
                 val currentRoute = currentBackStack?.destination?.route
 
                 LaunchedEffect(Unit) {
+                    // Small delay to ensure NavHost finishes first frame before we try to navigate
+                    kotlinx.coroutines.delay(200)
                     _intentFlow.collect { currentIntent ->
                         var targetUrl: String? = null
                         if (currentIntent.hasExtra("article_url")) {

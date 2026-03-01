@@ -466,35 +466,39 @@ fun NewsstandScreen(
             }
         }
 
+        // Gather current category list for dropdown
+        val allCategoryOptions = remember(feeds) {
+            val base = listOf("General", "Technology", "Science", "World", "Politics", "Sports",
+                              "Finance", "Health", "Entertainment", "Business", "Investigative")
+            val fromFeeds = feeds.flatMap { it.categories }.distinct()
+            (base + fromFeeds).distinct().sorted()
+        }
+
         if (showAddDialog) {
             AddFeedDialog(
                 onDismiss = { showAddDialog = false },
+                existingCategories = allCategoryOptions,
                 onAdd = { title, url, categoryName ->
-                    scope.launch {
-                        val cats = listOf(categoryName)
-                        val err = newsRepository.addFeed(url, title, cats, "Global")
-                        if (err == null) {
-                             snackbarHostState.showSnackbar("Added $title")
-                             showAddDialog = false
-                        } else {
-                             snackbarHostState.showSnackbar("Invalid Feed: $err")
-                        }
-                    }
+                    val cats = listOf(categoryName)
+                    val err = newsRepository.addFeed(url, title, cats, "Global")
+                    if (err == null) { snackbarHostState.showSnackbar("Added $title") }
+                    err
                 }
             )
         }
 
         if (feedToEdit != null) {
+            val captureFeed = feedToEdit!!  // capture local copy to avoid race condition
             EditFeedDialog(
-                feed = feedToEdit!!,
+                feed = captureFeed,
+                existingCategories = allCategoryOptions,
                 onDismiss = { feedToEdit = null },
                 onSave = { updatedTitle, updatedUrl, updatedCategoryName ->
                     scope.launch {
-                        val cats = listOf(updatedCategoryName)
-                        val updatedFeed = feedToEdit!!.copy(
+                        val updatedFeed = captureFeed.copy(
                             title = updatedTitle,
                             url = updatedUrl,
-                            categories = cats
+                            categories = listOf(updatedCategoryName)
                         )
                         newsRepository.updateFeed(updatedFeed)
                         snackbarHostState.showSnackbar("Updated $updatedTitle")
@@ -567,56 +571,216 @@ fun ExpandableGroup(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddFeedDialog(onDismiss: () -> Unit, onAdd: (String, String, String) -> Unit) {
+fun CategoryDropdown(
+    selectedCategory: String,
+    existingCategories: List<String>,
+    onCategorySelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var showNewField by remember { mutableStateOf(false) }
+    var newCat by remember { mutableStateOf("") }
+
+    Column {
+        ExposedDropdownMenuBox(
+            expanded = expanded && !showNewField,
+            onExpandedChange = { if (!showNewField) expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedCategory,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(R.string.category)) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && !showNewField) },
+                modifier = Modifier.fillMaxWidth().menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = expanded && !showNewField,
+                onDismissRequest = { expanded = false }
+            ) {
+                existingCategories.forEach { cat ->
+                    DropdownMenuItem(
+                        text = { Text(cat) },
+                        onClick = { onCategorySelected(cat); expanded = false }
+                    )
+                }
+                Divider()
+                DropdownMenuItem(
+                    text = { Text("+ New category...") },
+                    onClick = { showNewField = true; expanded = false }
+                )
+            }
+        }
+
+        if (showNewField) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = newCat,
+                onValueChange = { newCat = it },
+                label = { Text("New category name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                trailingIcon = {
+                    Row {
+                        IconButton(onClick = {
+                            if (newCat.isNotBlank()) {
+                                val formatted = newCat.trim().replaceFirstChar { it.uppercase() }
+                                onCategorySelected(formatted)
+                                showNewField = false
+                                newCat = ""
+                            }
+                        }) { Icon(Icons.Default.Check, contentDescription = "Confirm") }
+                        IconButton(onClick = { showNewField = false; newCat = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel")
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun AddFeedDialog(
+    onDismiss: () -> Unit,
+    existingCategories: List<String>,
+    onAdd: suspend (String, String, String) -> String?
+) {
     var title by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("General") }
+    var category by remember { mutableStateOf(existingCategories.firstOrNull() ?: "General") }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
+    var success by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isLoading) onDismiss() },
         title = { Text(stringResource(R.string.custom_feed)) },
         text = {
             Column {
-                TextField(value = title, onValueChange = { title = it }, label = { Text(stringResource(R.string.title)) })
+                TextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.title)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                TextField(value = url, onValueChange = { url = it }, label = { Text(stringResource(R.string.url)) })
+                TextField(
+                    value = url,
+                    onValueChange = { url = it; errorMsg = null; success = false },
+                    label = { Text(stringResource(R.string.url)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = errorMsg != null
+                )
+                if (errorMsg != null) {
+                    Text(
+                        text = errorMsg!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
-                TextField(value = category, onValueChange = { category = it }, label = { Text(stringResource(R.string.category)) })
+                CategoryDropdown(
+                    selectedCategory = category,
+                    existingCategories = existingCategories,
+                    onCategorySelected = { category = it }
+                )
             }
         },
         confirmButton = {
-            Button(onClick = { onAdd(title, url, category) }) { Text(stringResource(R.string.add)) }
+            Button(
+                onClick = {
+                    if (!isLoading && !success) {
+                        isLoading = true
+                        errorMsg = null
+                        scope.launch {
+                            val err = onAdd(title, url, category)
+                            if (err == null) {
+                                success = true
+                                kotlinx.coroutines.delay(600)
+                                onDismiss()
+                            } else {
+                                errorMsg = err
+                            }
+                            isLoading = false
+                        }
+                    }
+                },
+                enabled = url.isNotBlank() && title.isNotBlank() && !isLoading
+            ) {
+                when {
+                    isLoading -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    success -> Icon(Icons.Default.Check, contentDescription = null)
+                    else -> Text(stringResource(R.string.add))
+                }
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            if (!isLoading) TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
 
 @Composable
-fun EditFeedDialog(feed: FeedEntity, onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
+fun EditFeedDialog(
+    feed: FeedEntity,
+    existingCategories: List<String>,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String) -> Unit
+) {
     var title by remember { mutableStateOf(feed.title) }
     var url by remember { mutableStateOf(feed.url) }
     var category by remember { mutableStateOf(feed.categories.firstOrNull() ?: "General") }
+    var isSaving by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isSaving) onDismiss() },
         title = { Text("Edit Feed") },
         text = {
             Column {
-                TextField(value = title, onValueChange = { title = it }, label = { Text(stringResource(R.string.title)) })
+                TextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.title)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                TextField(value = url, onValueChange = { url = it }, label = { Text(stringResource(R.string.url)) })
+                TextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text(stringResource(R.string.url)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                TextField(value = category, onValueChange = { category = it }, label = { Text(stringResource(R.string.category)) })
+                CategoryDropdown(
+                    selectedCategory = category,
+                    existingCategories = existingCategories,
+                    onCategorySelected = { category = it }
+                )
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(title, url, category); onDismiss() }) { Text(stringResource(R.string.save)) }
+            Button(
+                onClick = {
+                    if (!isSaving) {
+                        isSaving = true
+                        scope.launch {
+                            onSave(title, url, category)
+                        }
+                    }
+                },
+                enabled = !isSaving
+            ) {
+                if (isSaving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Text(stringResource(R.string.save))
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            if (!isSaving) TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

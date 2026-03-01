@@ -102,7 +102,7 @@ class RssParser {
                         currentImageUrl = null
                     } else if (isInsideItem) {
                         when (name.lowercase()) {
-                            "title" -> currentTitle = readText(parser)
+                            "title" -> currentTitle = android.text.Html.fromHtml(readText(parser), android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
                             // link in RSS is text content, in Atom it's often an element with href attribute
                             "link" -> {
                                 val href = parser.getAttributeValue(null, "href")
