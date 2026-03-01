@@ -85,8 +85,9 @@ class NewsRepository(
             if (whitelist.isEmpty()) {
                 emptyList() // Return empty if no interests defined, UI handles "Add Interests" prompt
             } else {
+                val whitelistPatterns = whitelist.map { Regex("\\b${Regex.escape(it)}\\b", RegexOption.IGNORE_CASE) }
                 blacklisted.filter { article ->
-                    whitelist.any { keyword -> article.title.contains(keyword, ignoreCase = true) }
+                    whitelistPatterns.any { pattern -> pattern.containsMatchIn(article.title) }
                 }
             }
         }
@@ -106,10 +107,9 @@ class NewsRepository(
     
     private fun filterArticles(articles: List<ArticleEntity>, blacklist: Set<String>): List<ArticleEntity> {
         if (blacklist.isEmpty()) return articles
+        val patterns = blacklist.map { Regex("\\b${Regex.escape(it)}\\b", RegexOption.IGNORE_CASE) }
         return articles.filter { article ->
-            blacklist.none { keyword -> 
-                article.title.contains(keyword, ignoreCase = true) 
-            }
+            patterns.none { pattern -> pattern.containsMatchIn(article.title) }
         }
     }
 
@@ -219,8 +219,9 @@ class NewsRepository(
 
                             // Check for notifications
                             if (whitelist.isNotEmpty()) {
+                                val whitelistPatterns = whitelist.map { Regex("\\b${Regex.escape(it)}\\b", RegexOption.IGNORE_CASE) }
                                 newEntities.forEach { article ->
-                                    if (whitelist.any { article.title.contains(it, ignoreCase = true) }) {
+                                    if (whitelistPatterns.any { it.containsMatchIn(article.title) }) {
                                         notificationHelper.sendNotification(article.title, article.link)
                                     }
                                 }
