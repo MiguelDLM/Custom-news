@@ -425,11 +425,18 @@ fun ReorderableItem(item: String, index: Int, onMoveUp: () -> Unit, onMoveDown: 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutSettings(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val versionName = try {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
+    } catch (e: Exception) {
+        "Unknown"
+    }
+
     Scaffold(topBar = { TopAppBar(title = { Text("About") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }) }) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(64.dp).padding(bottom = 16.dp), tint = MaterialTheme.colorScheme.primary)
             Text(text = "NewsReader", style = MaterialTheme.typography.headlineMedium)
-            Text(text = "Version 1.0.0", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = "Version $versionName", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(24.dp))
             Text(text = "A simple, clean news reader application.", style = MaterialTheme.typography.bodyLarge)
             Spacer(modifier = Modifier.height(8.dp))

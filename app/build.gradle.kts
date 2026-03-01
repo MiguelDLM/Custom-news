@@ -15,8 +15,8 @@ android {
         applicationId = "com.museovirtualnacional.strogoff"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.0.9"
+        versionCode = 7
+        versionName = "1.0.10"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -251,14 +251,35 @@ class NewsRepository(
         settingsRepository.setTabOrder(order)
     }
     
-    // Updated list of suggested feeds
-    // Loaded from assets/suggested_feeds.json to avoid method size limits
     val suggestedFeeds: List<SuggestedFeed> by lazy {
         try {
             val inputStream = context.assets.open("suggested_feeds.json")
-            val reader = InputStreamReader(inputStream)
-            val type = object : TypeToken<List<SuggestedFeed>>() {}.type
-            Gson().fromJson(reader, type)
+            val jsonString = inputStream.bufferedReader().use { it.readText() }
+            val jsonArray = org.json.JSONArray(jsonString)
+            val result = mutableListOf<SuggestedFeed>()
+            
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val cats = mutableListOf<Category>()
+                val catArray = obj.optJSONArray("categories")
+                if (catArray != null) {
+                    for (j in 0 until catArray.length()) {
+                        cats.add(Category.fromString(catArray.getString(j)))
+                    }
+                } else {
+                    cats.add(Category.GENERAL)
+                }
+                
+                result.add(
+                    SuggestedFeed(
+                        url = obj.getString("url"),
+                        title = obj.getString("title"),
+                        categories = cats,
+                        country = obj.optString("country", "Global")
+                    )
+                )
+            }
+            result
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
@@ -269,36 +290,45 @@ class NewsRepository(
         if (token.isBlank() || query.isBlank()) return emptyList()
         return withContext(Dispatchers.IO) {
             try {
-                val url = "https://api.feedspot.com/v1/search.json?query=${java.net.URLEncoder.encode(query, "UTF-8")}&filter=all"
+                val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8").replace("+", "%20")
+                val url = "https://api.feedspot.com/v1/search.json?query=$encodedQuery&filter=all"
                 val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-                connection.setRequestProperty("Authorization", token)
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                connection.setRequestProperty("Authorization", token.trim())
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:109.0) Gecko/109.0 Firefox/112.0")
+                connection.setRequestProperty("Accept", "application/json")
                 connection.requestMethod = "GET"
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
                 
                 if (connection.responseCode == 200) {
                     val stream = connection.inputStream
                     val response = stream.bufferedReader().use { it.readText() }
                     
-                    val jsonArray = org.json.JSONArray(response)
-                    val result = mutableListOf<SuggestedFeed>()
-                    for (i in 0 until jsonArray.length()) {
-                        val obj = jsonArray.getJSONObject(i)
-                        val feedName = obj.optString("feed_name")
-                        val feedUrl = obj.optString("feed_url")
-                        val domain = obj.optString("feed_domain", "Global")
-                        
-                        if (feedUrl.isNotEmpty() && feedName.isNotEmpty()) {
-                            result.add(
-                                SuggestedFeed(
-                                    url = feedUrl,
-                                    title = feedName,
-                                    categories = listOf(Category.fromString("Feedspot")),
-                                    country = domain
+                    if (response.trim().startsWith("[")) {
+                        val jsonArray = org.json.JSONArray(response)
+                        val result = mutableListOf<SuggestedFeed>()
+                        for (i in 0 until jsonArray.length()) {
+                            val obj = jsonArray.getJSONObject(i)
+                            val feedName = obj.optString("feed_name")
+                            val feedUrl = obj.optString("feed_url")
+                            val domain = obj.optString("feed_domain", "Global")
+                            
+                            if (feedUrl.isNotEmpty() && feedName.isNotEmpty()) {
+                                result.add(
+                                    SuggestedFeed(
+                                        url = feedUrl,
+                                        title = feedName,
+                                        categories = listOf(Category.fromString("Feedspot")),
+                                        country = domain
+                                    )
                                 )
-                            )
+                            }
                         }
+                        result
+                    } else {
+                        // Possibly an error object
+                        emptyList()
                     }
-                    result
                 } else {
                     emptyList()
                 }
