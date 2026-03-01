@@ -159,6 +159,7 @@ class MainActivity : ComponentActivity() {
                         composable("settings") {
                             SettingsScreen(
                                 settingsRepository = app.settingsRepository,
+                                newsRepository = app.newsRepository,
                                 onBack = { navController.popBackStack() },
                                 onScriptManagerClick = { navController.navigate("scripts") }
                             )

@@ -19,6 +19,9 @@ interface FeedDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFeed(feed: FeedEntity)
 
+    @androidx.room.Update
+    suspend fun updateFeed(feed: FeedEntity)
+
     @Delete
     suspend fun deleteFeed(feed: FeedEntity)
 }

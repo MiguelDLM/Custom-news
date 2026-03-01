@@ -32,6 +32,9 @@ import androidx.compose.ui.window.Dialog
 import com.museovirtualnacional.strogoff.R
 import com.museovirtualnacional.strogoff.data.repository.SettingsRepository
 import com.museovirtualnacional.strogoff.data.repository.AdBlocker
+import com.museovirtualnacional.strogoff.data.repository.NewsRepository
+import com.museovirtualnacional.strogoff.data.local.entity.FeedEntity
+import com.museovirtualnacional.strogoff.data.local.entity.Category
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import java.io.BufferedReader
@@ -55,6 +58,7 @@ enum class SettingsPage {
 @Composable
 fun SettingsScreen(
     settingsRepository: SettingsRepository,
+    newsRepository: NewsRepository,
     onBack: () -> Unit,
     onScriptManagerClick: () -> Unit // Add navigation callback
 ) {
@@ -68,8 +72,8 @@ fun SettingsScreen(
         SettingsPage.LANGUAGE -> LanguageSettings(settingsRepository) { currentPage = SettingsPage.MAIN }
         SettingsPage.THEME -> ThemeSettings(settingsRepository) { currentPage = SettingsPage.MAIN }
         SettingsPage.ADBLOCK -> AdBlockSettings(settingsRepository) { currentPage = SettingsPage.MAIN }
-        SettingsPage.BACKUP -> BackupSettings(settingsRepository) { currentPage = SettingsPage.MAIN }
-        SettingsPage.API_KEYS -> ApiKeysSettings(settingsRepository) { currentPage = SettingsPage.MAIN }
+        SettingsPage.BACKUP -> BackupSettings(settingsRepository, newsRepository) { currentPage = SettingsPage.MAIN }
+        SettingsPage.API_KEYS -> ApiKeysSettings(settingsRepository, newsRepository) { currentPage = SettingsPage.MAIN }
         SettingsPage.SCRIPT_MANAGER -> { /* Handled externally or we could embed it here if refactored */ }
         SettingsPage.ABOUT -> AboutSettings(onBack = { currentPage = SettingsPage.MAIN })
     }
@@ -313,29 +317,52 @@ fun ThemeSettings(repository: SettingsRepository, onBack: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BackupSettings(repository: SettingsRepository, onBack: () -> Unit) {
+fun BackupSettings(repository: SettingsRepository, newsRepository: NewsRepository, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> uri?.let { scope.launch { exportSettings(context, repository, it) } } }
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { scope.launch { importSettings(context, repository, it) } } }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> 
+        uri?.let { 
+            scope.launch { 
+                exportSettings(context, repository, newsRepository, it) 
+                snackbarHostState.showSnackbar("Export successful")
+            } 
+        } 
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> 
+        uri?.let { 
+            scope.launch { 
+                importSettings(context, repository, newsRepository, it) 
+                snackbarHostState.showSnackbar("Import successful")
+            } 
+        } 
+    }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Backup & Restore") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }) }) { padding ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = { TopAppBar(title = { Text("Backup & Restore") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }) }
+    ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-            Button(onClick = { exportLauncher.launch("news_settings_backup.json") }, modifier = Modifier.fillMaxWidth()) { Text("Export Settings") }
+            Button(onClick = { exportLauncher.launch("news_settings_backup.json") }, modifier = Modifier.fillMaxWidth()) { Text("Export Settings & Feeds") }
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(onClick = { importLauncher.launch("application/json") }, modifier = Modifier.fillMaxWidth()) { Text("Import Settings") }
+            OutlinedButton(onClick = { importLauncher.launch("application/json") }, modifier = Modifier.fillMaxWidth()) { Text("Import Settings & Feeds") }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ApiKeysSettings(repository: SettingsRepository, onBack: () -> Unit) {
+fun ApiKeysSettings(repository: SettingsRepository, newsRepository: NewsRepository, onBack: () -> Unit) {
     val feedspotToken by repository.feedspotToken.collectAsState(initial = "")
     var tokenInput by remember(feedspotToken) { mutableStateOf(feedspotToken) }
     val scope = rememberCoroutineScope()
+    var isVerifying by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("API Keys") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }) }) { padding ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = { TopAppBar(title = { Text("API Keys") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") } }) }
+    ) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp)) {
             Text("Feedspot API Token", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(8.dp))
@@ -349,10 +376,32 @@ fun ApiKeysSettings(repository: SettingsRepository, onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Button(
-                onClick = { scope.launch { repository.setFeedspotToken(tokenInput) } },
-                modifier = Modifier.align(Alignment.End)
+                onClick = { 
+                    isVerifying = true
+                    scope.launch { 
+                        if (tokenInput.isNotBlank()) {
+                            val testResults = newsRepository.searchFeedspot("test", tokenInput)
+                            if (testResults.isNotEmpty()) {
+                                snackbarHostState.showSnackbar("Token Validated Successfully!")
+                                repository.setFeedspotToken(tokenInput) 
+                            } else {
+                                snackbarHostState.showSnackbar("Error: Invalid Token or Unable to reach Feedspot.")
+                            }
+                        } else {
+                            repository.setFeedspotToken(tokenInput)
+                            snackbarHostState.showSnackbar("Token Cleared")
+                        }
+                        isVerifying = false
+                    } 
+                },
+                modifier = Modifier.align(Alignment.End),
+                enabled = !isVerifying
             ) {
-                Text(stringResource(R.string.save))
+                if (isVerifying) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.save))
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text("A token is required to search for new feeds through Feedspot's API.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -446,7 +495,7 @@ fun AboutSettings(onBack: () -> Unit) {
     }
 }
 
-suspend fun exportSettings(context: Context, repository: SettingsRepository, uri: Uri) {
+suspend fun exportSettings(context: Context, repository: SettingsRepository, newsRepository: NewsRepository, uri: Uri) {
     try {
         val json = JSONObject()
         json.put("theme", repository.theme.first())
@@ -455,11 +504,26 @@ suspend fun exportSettings(context: Context, repository: SettingsRepository, uri
         json.put("whitelist", JSONArray(repository.keywordWhitelist.first()))
         json.put("blacklist", JSONArray(repository.keywordBlacklist.first()))
         json.put("tabOrder", JSONArray(repository.tabOrder.first()))
+        json.put("feedspotToken", repository.feedspotToken.first())
+        
+        val feedsArray = JSONArray()
+        newsRepository.allFeeds.first().forEach { feed ->
+            val f = JSONObject()
+            f.put("url", feed.url)
+            f.put("title", feed.title)
+            val catsArr = JSONArray()
+            feed.categories.forEach { catsArr.put(it.name) }
+            f.put("categories", catsArr)
+            f.put("country", feed.country)
+            feedsArray.put(f)
+        }
+        json.put("subscriptions", feedsArray)
+        
         context.contentResolver.openOutputStream(uri)?.use { it.write(json.toString(4).toByteArray()) }
     } catch (e: Exception) { e.printStackTrace() }
 }
 
-suspend fun importSettings(context: Context, repository: SettingsRepository, uri: Uri) {
+suspend fun importSettings(context: Context, repository: SettingsRepository, newsRepository: NewsRepository, uri: Uri) {
     try {
         val content = StringBuilder()
         context.contentResolver.openInputStream(uri)?.use { BufferedReader(InputStreamReader(it)).use { r -> r.readLines().forEach { l -> content.append(l) } } }
@@ -470,5 +534,26 @@ suspend fun importSettings(context: Context, repository: SettingsRepository, uri
         if (json.has("whitelist")) { val arr = json.getJSONArray("whitelist"); val set = mutableSetOf<String>(); for(i in 0 until arr.length()) set.add(arr.getString(i)); repository.setKeywordWhitelist(set) }
         if (json.has("blacklist")) { val arr = json.getJSONArray("blacklist"); val set = mutableSetOf<String>(); for(i in 0 until arr.length()) set.add(arr.getString(i)); repository.setKeywordBlacklist(set) }
         if (json.has("tabOrder")) { val arr = json.getJSONArray("tabOrder"); val list = mutableListOf<String>(); for(i in 0 until arr.length()) list.add(arr.getString(i)); repository.setTabOrder(list) }
+        if (json.has("feedspotToken")) repository.setFeedspotToken(json.getString("feedspotToken"))
+        
+        if (json.has("subscriptions")) {
+            val arr = json.getJSONArray("subscriptions")
+            for(i in 0 until arr.length()) {
+                val f = arr.getJSONObject(i)
+                val cats = mutableListOf<com.museovirtualnacional.strogoff.data.local.entity.Category>()
+                if (f.has("categories")) {
+                    val catArr = f.getJSONArray("categories")
+                    for(j in 0 until catArr.length()) {
+                        cats.add(com.museovirtualnacional.strogoff.data.local.entity.Category.fromString(catArr.getString(j)))
+                    }
+                }
+                newsRepository.addFeed(
+                    url = f.getString("url"),
+                    title = f.getString("title"),
+                    categories = cats,
+                    country = f.optString("country", "Global")
+                )
+            }
+        }
     } catch (e: Exception) { e.printStackTrace() }
 }

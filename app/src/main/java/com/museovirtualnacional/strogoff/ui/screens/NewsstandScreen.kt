@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
@@ -45,6 +46,7 @@ fun NewsstandScreen(
     val brokenFeeds by newsRepository.brokenFeeds.collectAsState(initial = emptySet())
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
+    var feedToEdit by remember { mutableStateOf<FeedEntity?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     
     // Grouping Mode
@@ -254,8 +256,13 @@ fun NewsstandScreen(
                                     }
                                 },
                                 trailingContent = {
-                                    IconButton(onClick = { scope.launch { newsRepository.deleteFeed(feed) } }) {
-                                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.unsubscribe))
+                                    Row {
+                                        IconButton(onClick = { feedToEdit = feed }) {
+                                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                                        }
+                                        IconButton(onClick = { scope.launch { newsRepository.deleteFeed(feed) } }) {
+                                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.unsubscribe))
+                                        }
                                     }
                                 }
                             )
@@ -477,6 +484,26 @@ fun NewsstandScreen(
                 }
             )
         }
+
+        if (feedToEdit != null) {
+            EditFeedDialog(
+                feed = feedToEdit!!,
+                onDismiss = { feedToEdit = null },
+                onSave = { updatedTitle, updatedUrl, updatedCategoryName ->
+                    scope.launch {
+                        val cats = listOf(Category.fromString(updatedCategoryName))
+                        val updatedFeed = feedToEdit!!.copy(
+                            title = updatedTitle,
+                            url = updatedUrl,
+                            categories = cats
+                        )
+                        newsRepository.updateFeed(updatedFeed)
+                        snackbarHostState.showSnackbar("Updated $updatedTitle")
+                        feedToEdit = null
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -561,6 +588,33 @@ fun AddFeedDialog(onDismiss: () -> Unit, onAdd: (String, String, String) -> Unit
         },
         confirmButton = {
             Button(onClick = { onAdd(title, url, category) }) { Text(stringResource(R.string.add)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+}
+
+@Composable
+fun EditFeedDialog(feed: FeedEntity, onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
+    var title by remember { mutableStateOf(feed.title) }
+    var url by remember { mutableStateOf(feed.url) }
+    var category by remember { mutableStateOf(feed.categories.firstOrNull()?.name ?: "General") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Feed") },
+        text = {
+            Column {
+                TextField(value = title, onValueChange = { title = it }, label = { Text(stringResource(R.string.title)) })
+                Spacer(modifier = Modifier.height(8.dp))
+                TextField(value = url, onValueChange = { url = it }, label = { Text(stringResource(R.string.url)) })
+                Spacer(modifier = Modifier.height(8.dp))
+                TextField(value = category, onValueChange = { category = it }, label = { Text(stringResource(R.string.category)) })
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(title, url, category) }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }

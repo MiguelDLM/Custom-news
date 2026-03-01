@@ -270,14 +270,19 @@ class NewsRepository(
                     cats.add(Category.GENERAL)
                 }
                 
-                result.add(
-                    SuggestedFeed(
-                        url = obj.getString("url"),
-                        title = obj.getString("title"),
-                        categories = cats,
-                        country = obj.optString("country", "Global")
+                val urlVal = obj.optString("url", "")
+                val titleVal = obj.optString("title", "")
+                
+                if (urlVal.isNotBlank() && titleVal.isNotBlank()) {
+                    result.add(
+                        SuggestedFeed(
+                            url = urlVal,
+                            title = titleVal,
+                            categories = cats,
+                            country = obj.optString("country", "Global")
+                        )
                     )
-                )
+                }
             }
             result
         } catch (e: Exception) {
@@ -336,6 +341,12 @@ class NewsRepository(
                 e.printStackTrace()
                 emptyList()
             }
+        }
+    }
+
+    suspend fun updateFeed(feed: FeedEntity) {
+        withContext(Dispatchers.IO) {
+            feedDao.updateFeed(feed)
         }
     }
 }

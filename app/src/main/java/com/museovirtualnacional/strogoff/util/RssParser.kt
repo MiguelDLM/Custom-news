@@ -13,16 +13,39 @@ import java.util.regex.Pattern
 class RssParser {
 
     suspend fun parse(urlString: String): List<Article> {
-        val url = URL(urlString)
-        val connection = url.openConnection() as HttpURLConnection
-        connection.connectTimeout = 15000 // Increased timeout
-        connection.readTimeout = 15000
-        connection.requestMethod = "GET"
-        connection.setRequestProperty("User-Agent", "NewsReader/1.0") // Add User-Agent
-        connection.connect()
+        var currentUrl = urlString
+        var redirectCount = 0
+        var connection: HttpURLConnection? = null
+        var responseCode = 0
 
-        if (connection.responseCode != 200) {
-            throw IllegalStateException("Unexpected response code: ${connection.responseCode}")
+        while (redirectCount < 5) {
+            val url = URL(currentUrl)
+            connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("User-Agent", "NewsReader/1.0 (Mobile)")
+            connection.instanceFollowRedirects = false // Disable auto-redirect to handle protocol changes manually
+            connection.connect()
+
+            responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
+                responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
+                responseCode == HttpURLConnection.HTTP_SEE_OTHER || 
+                responseCode == 307 || 
+                responseCode == 308) {
+                
+                val newUrl = connection.getHeaderField("Location")
+                if (newUrl == null) break
+                currentUrl = newUrl
+                redirectCount++
+            } else {
+                break
+            }
+        }
+
+        if (connection == null || responseCode != HttpURLConnection.HTTP_OK) {
+            throw IllegalStateException("Unexpected response code: $responseCode")
         }
 
         val contentType = connection.contentType
