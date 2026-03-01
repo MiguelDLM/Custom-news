@@ -2,6 +2,8 @@ package com.museovirtualnacional.strogoff
 
 import android.app.Application
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.museovirtualnacional.strogoff.data.local.AppDatabase
 import com.museovirtualnacional.strogoff.data.repository.NewsRepository
 import com.museovirtualnacional.strogoff.data.repository.ScriptRepository
@@ -16,10 +18,17 @@ class NewsApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Empty migration: List<Category> to List<String> both compile to TEXT via TypeConverters
+            }
+        }
+
         database = Room.databaseBuilder(
             applicationContext,
             AppDatabase::class.java, "news-database"
         )
+        .addMigrations(MIGRATION_5_6)
         .fallbackToDestructiveMigration()
         .build()
 

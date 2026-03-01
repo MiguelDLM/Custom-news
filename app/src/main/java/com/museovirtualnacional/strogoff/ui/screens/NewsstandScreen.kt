@@ -31,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.museovirtualnacional.strogoff.R
-import com.museovirtualnacional.strogoff.data.local.entity.Category
 import com.museovirtualnacional.strogoff.data.local.entity.FeedEntity
 import com.museovirtualnacional.strogoff.data.repository.NewsRepository
 import com.museovirtualnacional.strogoff.data.repository.SuggestedFeed
@@ -175,7 +174,7 @@ fun NewsstandScreen(
         val groups = if (groupByCountry) {
             filteredSuggestions.groupBy { it.country }
         } else {
-            filteredSuggestions.groupBy { it.categories.firstOrNull()?.name ?: "General" }
+            filteredSuggestions.groupBy { it.categories.firstOrNull() ?: "General" }
         }.toList().sortedBy { it.first }
 
         // Take only a pageful of groups
@@ -249,7 +248,7 @@ fun NewsstandScreen(
                                 headlineContent = { Text(feed.title) },
                                 supportingContent = { 
                                     Column {
-                                        Text(feed.categories.joinToString(", ") { it.name })
+                                        Text(feed.categories.joinToString(", "))
                                         if (isBroken) {
                                             Text("Invalid Feed", color = MaterialTheme.colorScheme.error)
                                         }
@@ -299,7 +298,7 @@ fun NewsstandScreen(
                             ListItem(
                                 headlineContent = { Text(feed.title) },
                                 supportingContent = {
-                                    val cats = feed.categories.joinToString(", ") { it.name }
+                                    val cats = feed.categories.joinToString(", ")
                                     Text("$cats • ${feed.country}")
                                 },
                                 trailingContent = {
@@ -395,7 +394,7 @@ fun NewsstandScreen(
                                 ListItem(
                                     headlineContent = { Text(feed.title) },
                                     supportingContent = {
-                                        val cats = feed.categories.joinToString(", ") { it.name }
+                                        val cats = feed.categories.joinToString(", ")
                                         Text("$cats • ${feed.country}")
                                     },
                                     trailingContent = {
@@ -472,7 +471,7 @@ fun NewsstandScreen(
                 onDismiss = { showAddDialog = false },
                 onAdd = { title, url, categoryName ->
                     scope.launch {
-                        val cats = listOf(Category.fromString(categoryName))
+                        val cats = listOf(categoryName)
                         val err = newsRepository.addFeed(url, title, cats, "Global")
                         if (err == null) {
                              snackbarHostState.showSnackbar("Added $title")
@@ -491,7 +490,7 @@ fun NewsstandScreen(
                 onDismiss = { feedToEdit = null },
                 onSave = { updatedTitle, updatedUrl, updatedCategoryName ->
                     scope.launch {
-                        val cats = listOf(Category.fromString(updatedCategoryName))
+                        val cats = listOf(updatedCategoryName)
                         val updatedFeed = feedToEdit!!.copy(
                             title = updatedTitle,
                             url = updatedUrl,
@@ -512,7 +511,7 @@ fun ExpandableGroup(
     title: String, 
     feeds: List<SuggestedFeed>, 
     currentFeeds: List<FeedEntity>,
-    onAdd: (String, String, List<Category>, String) -> Unit
+    onAdd: (String, String, List<String>, String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -549,7 +548,7 @@ fun ExpandableGroup(
                     ListItem(
                         headlineContent = { Text(feed.title) },
                         supportingContent = { 
-                            val cats = feed.categories.joinToString(", ") { it.name }
+                            val cats = feed.categories.joinToString(", ")
                             Text("$cats • ${feed.country}") 
                         },
                         trailingContent = {
@@ -599,7 +598,7 @@ fun AddFeedDialog(onDismiss: () -> Unit, onAdd: (String, String, String) -> Unit
 fun EditFeedDialog(feed: FeedEntity, onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
     var title by remember { mutableStateOf(feed.title) }
     var url by remember { mutableStateOf(feed.url) }
-    var category by remember { mutableStateOf(feed.categories.firstOrNull()?.name ?: "General") }
+    var category by remember { mutableStateOf(feed.categories.firstOrNull() ?: "General") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -614,7 +613,7 @@ fun EditFeedDialog(feed: FeedEntity, onDismiss: () -> Unit, onSave: (String, Str
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(title, url, category) }) { Text(stringResource(R.string.save)) }
+            Button(onClick = { onSave(title, url, category); onDismiss() }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }

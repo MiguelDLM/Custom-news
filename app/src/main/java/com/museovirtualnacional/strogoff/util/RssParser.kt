@@ -193,12 +193,6 @@ class RssParser {
         var text = html.replace(Regex("<script.*?</script>", RegexOption.DOT_MATCHES_ALL), "")
         text = text.replace(Regex("<style.*?</style>", RegexOption.DOT_MATCHES_ALL), "")
         text = text.replace(Regex("<.*?>"), "")
-        text = text.replace("&nbsp;", " ")
-            .replace("&amp;", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&#39;", "'")
-        return text.trim()
+        return android.text.Html.fromHtml(text, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim()
     }
 }

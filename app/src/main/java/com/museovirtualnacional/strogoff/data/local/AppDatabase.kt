@@ -13,7 +13,7 @@ import com.museovirtualnacional.strogoff.data.local.entity.FeedEntity
 import com.museovirtualnacional.strogoff.data.local.entity.ScriptEntity
 import com.museovirtualnacional.strogoff.data.local.entity.SearchHistoryEntity
 
-@Database(entities = [FeedEntity::class, ScriptEntity::class, ArticleEntity::class, SearchHistoryEntity::class], version = 5, exportSchema = false)
+@Database(entities = [FeedEntity::class, ScriptEntity::class, ArticleEntity::class, SearchHistoryEntity::class], version = 6, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun feedDao(): FeedDao

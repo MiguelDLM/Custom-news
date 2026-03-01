@@ -25,7 +25,6 @@ import kotlinx.coroutines.withContext
 import com.museovirtualnacional.strogoff.data.local.dao.SearchHistoryDao
 import com.museovirtualnacional.strogoff.data.local.entity.SearchHistoryEntity
 
-import com.museovirtualnacional.strogoff.data.local.entity.Category
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.InputStreamReader
@@ -33,7 +32,7 @@ import java.io.InputStreamReader
 data class SuggestedFeed(
     val url: String,
     val title: String,
-    val categories: List<Category>,
+    val categories: List<String>,
     val country: String // "MX", "US", "ES"
 )
 
@@ -117,7 +116,7 @@ class NewsRepository(
     suspend fun getFeedCount(): Int = feedDao.getFeedCount()
 
     // Returns null on success, or an error message describing the failure
-    suspend fun addFeed(url: String, title: String, categories: List<com.museovirtualnacional.strogoff.data.local.entity.Category>, country: String = "Global"): String? {
+    suspend fun addFeed(url: String, title: String, categories: List<String>, country: String = "Global"): String? {
         // Validate feed: ensure it's reachable and a valid RSS/Atom feed and has at least one item
         return try {
             val parsed = withContext(Dispatchers.IO) {
@@ -211,7 +210,7 @@ class NewsRepository(
                                 imageUrl = article.imageUrl,
                                 pubDate = article.pubDate,
                                 pubDateMillis = DateUtils.parseDate(article.pubDate),
-                                category = feed.categories.firstOrNull()?.name ?: "General"
+                                category = feed.categories.firstOrNull() ?: "General"
                             )
                         }
                         
@@ -260,14 +259,14 @@ class NewsRepository(
             
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)
-                val cats = mutableListOf<Category>()
+                val cats = mutableListOf<String>()
                 val catArray = obj.optJSONArray("categories")
                 if (catArray != null) {
                     for (j in 0 until catArray.length()) {
-                        cats.add(Category.fromString(catArray.getString(j)))
+                        cats.add(normalizeCategory(catArray.getString(j)))
                     }
                 } else {
-                    cats.add(Category.GENERAL)
+                    cats.add("General")
                 }
                 
                 val urlVal = obj.optString("url", "")
@@ -323,7 +322,7 @@ class NewsRepository(
                                     SuggestedFeed(
                                         url = feedUrl,
                                         title = feedName,
-                                        categories = listOf(Category.fromString("Feedspot")),
+                                        categories = listOf("Feedspot"),
                                         country = domain
                                     )
                                 )
@@ -347,6 +346,29 @@ class NewsRepository(
     suspend fun updateFeed(feed: FeedEntity) {
         withContext(Dispatchers.IO) {
             feedDao.updateFeed(feed)
+            articleDao.deleteArticlesByFeed(feed.id) // Clear cached articles to force refetch under the new category
+        }
+    }
+
+    private fun normalizeCategory(value: String): String {
+        val normalized = value.trim().uppercase()
+        return when {
+            normalized.contains("TECH") -> "Technology"
+            normalized.contains("POLIT") -> "Politics"
+            normalized.contains("SPORT") -> "Sports"
+            normalized.contains("FINAN") || normalized.contains("ECON") -> "Finance"
+            normalized.contains("WORLD") -> "World"
+            normalized.contains("CIENCIA") || normalized.contains("SCIENCE") -> "Science"
+            normalized.contains("SALUD") || normalized.contains("HEALTH") -> "Health"
+            normalized == "GENERAL" -> "General"
+            else -> {
+                val word = value.trim()
+                if (word.isNotEmpty()) {
+                    word.first().uppercase() + word.substring(1).lowercase()
+                } else {
+                    "General"
+                }
+            }
         }
     }
 }

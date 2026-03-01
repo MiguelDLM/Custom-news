@@ -26,6 +26,7 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,8 +43,6 @@ import com.museovirtualnacional.strogoff.util.DateUtils
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.net.URI
-
-import com.museovirtualnacional.strogoff.data.local.entity.Category
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -67,9 +66,9 @@ fun HomeScreen(
     
     // Define all possible categories (as strings for display/tabs)
     // We map internal Category enums to localized display strings or simple names
-    val allCategories = remember(feeds, tabOrder) {
+    val allCategories: List<String> = remember(feeds, tabOrder) {
         // Collect all categories from feeds (flatten list of categories)
-        val rawCategories = (listOf("For You") + feeds.flatMap { it.categories }.map { it.name }.distinct().sorted())
+        val rawCategories = (listOf("For You") + feeds.flatMap { it.categories }.distinct().sorted())
         
         // Apply custom order if exists
         if (tabOrder.isNotEmpty()) {
@@ -84,7 +83,7 @@ fun HomeScreen(
     // Filter hidden tabs
     val visibleCategories = allCategories.filter { !hiddenTabs.contains(it) }
     
-    var selectedCategoryIndex by remember { mutableIntStateOf(0) }
+    var selectedCategoryIndex by rememberSaveable { mutableIntStateOf(0) }
     
     // Ensure index is valid if list shrinks
     if (selectedCategoryIndex >= visibleCategories.size && visibleCategories.isNotEmpty()) {
@@ -94,11 +93,11 @@ fun HomeScreen(
     val currentCategoryKey = visibleCategories.getOrElse(selectedCategoryIndex) { "For You" }
     
     // Search state
-    var isSearchActive by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     
     // Sorting State
-    var sortByDate by remember { mutableStateOf(true) } // true = Date, false = Source
+    var sortByDate by rememberSaveable { mutableStateOf(true) } // true = Date, false = Source
     var showSortMenu by remember { mutableStateOf(false) }
 
     // Articles State

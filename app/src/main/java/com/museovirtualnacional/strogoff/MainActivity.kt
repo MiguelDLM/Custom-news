@@ -176,11 +176,7 @@ class MainActivity : ComponentActivity() {
                                 url = decodedUrl,
                                 scriptRepository = app.scriptRepository,
                                 onBack = { 
-                                    navController.navigate("home") {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
+                                    navController.popBackStack()
                                 },
                                 onManageScripts = { domain ->
                                     val encodedDomain = URLEncoder.encode(domain, StandardCharsets.UTF_8.toString())

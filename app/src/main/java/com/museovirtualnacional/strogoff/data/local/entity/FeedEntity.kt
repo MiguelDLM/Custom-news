@@ -9,7 +9,7 @@ data class FeedEntity(
     val url: String,
     val title: String,
     val description: String? = null,
-    val categories: List<Category> = listOf(Category.GENERAL),
+    val categories: List<String> = listOf("General"),
     val country: String = "Global",
     val editorialLine: EditorialLine = EditorialLine.UNKNOWN
 )

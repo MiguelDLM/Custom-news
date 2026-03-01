@@ -34,7 +34,6 @@ import com.museovirtualnacional.strogoff.data.repository.SettingsRepository
 import com.museovirtualnacional.strogoff.data.repository.AdBlocker
 import com.museovirtualnacional.strogoff.data.repository.NewsRepository
 import com.museovirtualnacional.strogoff.data.local.entity.FeedEntity
-import com.museovirtualnacional.strogoff.data.local.entity.Category
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import java.io.BufferedReader
@@ -512,7 +511,7 @@ suspend fun exportSettings(context: Context, repository: SettingsRepository, new
             f.put("url", feed.url)
             f.put("title", feed.title)
             val catsArr = JSONArray()
-            feed.categories.forEach { catsArr.put(it.name) }
+            feed.categories.forEach { catsArr.put(it) }
             f.put("categories", catsArr)
             f.put("country", feed.country)
             feedsArray.put(f)
@@ -540,11 +539,11 @@ suspend fun importSettings(context: Context, repository: SettingsRepository, new
             val arr = json.getJSONArray("subscriptions")
             for(i in 0 until arr.length()) {
                 val f = arr.getJSONObject(i)
-                val cats = mutableListOf<com.museovirtualnacional.strogoff.data.local.entity.Category>()
+                val cats = mutableListOf<String>()
                 if (f.has("categories")) {
                     val catArr = f.getJSONArray("categories")
                     for(j in 0 until catArr.length()) {
-                        cats.add(com.museovirtualnacional.strogoff.data.local.entity.Category.fromString(catArr.getString(j)))
+                        cats.add(catArr.getString(j))
                     }
                 }
                 newsRepository.addFeed(
